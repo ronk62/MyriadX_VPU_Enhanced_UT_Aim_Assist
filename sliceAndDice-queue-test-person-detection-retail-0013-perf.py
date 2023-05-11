@@ -90,10 +90,12 @@ Results:
 labelMap = [ "person", "" ]
 
 ## yolo v3 tiny label texts
-# labelMap = [    "person",         "bicycle",    "car",           "motorbike",     "aeroplane",   "bus",           "train",    "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",   "parking meter", "bench",    "bird",           "cat",        "dog",           "horse",         "sheep",       "cow",           "elephant",    "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",    "handbag",       "tie",    "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball", "kite",          "baseball bat",    "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",      "wine glass",    "cup",    "fork",           "knife",      "spoon",         "bowl",          "banana",      "apple",         "sandwich",    "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",       "donut",         "cake",    "chair",          "sofa",       "pottedplant",   "bed",           "diningtable", "toilet",        "tvmonitor",    "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",  "microwave",     "oven",    "toaster",        "sink",       "refrigerator",  "book",          "clock",       "vase",          "scissors",    "teddy bear",     "hair drier", "toothbrush"]
+# labelMap = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
 
 
+# nnPathDefault = str((Path(__file__).parent / Path('./models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
 nnPathDefault = str((Path(__file__).parent / Path('./models/person-detection-retail-0013_openvino_2021.4_6shave.blob')).resolve().absolute())
+# nnPathDefault = str((Path(__file__).parent / Path('./models/yolo-v3-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
 parser = argparse.ArgumentParser()
 parser.add_argument('nnPath', nargs='?', help="Path to detection network blob", default=nnPathDefault)
 
@@ -143,8 +145,8 @@ objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
 objectTracker.inputDetections.setBlocking(True)
 ## select for correct model
-# objectTracker.setDetectionLabelsToTrack([15])  # track only person - mobilenet-ssd 
-objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
+objectTracker.setDetectionLabelsToTrack([15])  # track only person - mobilenet-ssd 
+# objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
