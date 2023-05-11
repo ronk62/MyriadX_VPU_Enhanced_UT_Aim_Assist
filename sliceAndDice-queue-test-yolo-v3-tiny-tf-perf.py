@@ -12,12 +12,21 @@ import dxcam
 camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
 
 '''
-5/11/2023 - test 1:
+5/11/2023 - test 1 - redo (with correct nn settings for yolo):
 - all queues set to maxSize=1, blocking=False
-- can't get good detections, so sFPS and latency are not the issue (yet)
+- also notice --> detectionNetwork.setNumInferenceThreads(2)
 
 Results:
-- N/A
+- dtCapFrame: 0.010992050170898438 eFPScapFrame: 90.97483121689879
+- dtNNdetections: 0.012943744659423828 eFPSnnDetections: 77.25738950007408
+- dtTrackletsData: 0.00700068473815918 eFPStrackletsData: 142.84314957165162
+- dtImshow: 0.0030007362365722656 eFPSimshow: 333.251438283979
+- fullLoopTime: 0.03393721580505371 eFPSfullLoopTime: 29.46617590194039
+
+
+- UsbSpeed.SUPER
+- Latency Det NN: 459.51 ms, Average latency: 459.51 ms, Std: 0.00
+- Latency trackFrame: 531.44 ms, Average latency: 495.47 ms, Std: 35.97
 
 '''
 
@@ -48,7 +57,8 @@ pipeline.setXLinkChunkSize(0)
 # Define sources and outputs
 manip = pipeline.create(dai.node.ImageManip)
 objectTracker = pipeline.create(dai.node.ObjectTracker)
-detectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
+# detectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork) # mobilenet-ssd and person-detection-retail-0013
+detectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork) # yolo-v3-tiny-tf
 
 manipOut = pipeline.create(dai.node.XLinkOut)
 xinFrame = pipeline.create(dai.node.XLinkIn)
@@ -76,8 +86,21 @@ manip.inputImage.setBlocking(True)
 
 # setting node configs
 detectionNetwork.setBlobPath(args.nnPath)
-detectionNetwork.setConfidenceThreshold(0.50)
+detectionNetwork.setConfidenceThreshold(0.75)
 detectionNetwork.input.setBlocking(True)
+
+###
+## Network specific settings for yolo-v3-tiny-tf
+# detectionNetwork.setConfidenceThreshold(0.5)
+detectionNetwork.setNumClasses(80)
+detectionNetwork.setCoordinateSize(4)
+detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319])
+detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
+detectionNetwork.setIouThreshold(0.5)
+# detectionNetwork.setBlobPath(nnPath)
+detectionNetwork.setNumInferenceThreads(2)
+detectionNetwork.input.setBlocking(False)
+###
 
 objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
@@ -85,7 +108,7 @@ objectTracker.inputDetections.setBlocking(True)
 ## select for correct model
 # objectTracker.setDetectionLabelsToTrack([15])  # track only person - mobilenet-ssd 
 # objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
-objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
+objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID

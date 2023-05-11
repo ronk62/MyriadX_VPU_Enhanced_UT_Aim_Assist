@@ -110,7 +110,8 @@ pipeline.setXLinkChunkSize(0)
 # Define sources and outputs
 manip = pipeline.create(dai.node.ImageManip)
 objectTracker = pipeline.create(dai.node.ObjectTracker)
-detectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
+detectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork) # mobilenet-ssd and person-detection-retail-0013
+# detectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork) # yolo-v3-tiny-tf
 
 manipOut = pipeline.create(dai.node.XLinkOut)
 xinFrame = pipeline.create(dai.node.XLinkIn)
