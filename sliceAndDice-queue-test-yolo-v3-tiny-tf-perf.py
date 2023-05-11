@@ -89,7 +89,6 @@ detectionNetwork.setBlobPath(args.nnPath)
 detectionNetwork.setConfidenceThreshold(0.75)
 detectionNetwork.input.setBlocking(True)
 
-###
 ## Network specific settings for yolo-v3-tiny-tf
 # detectionNetwork.setConfidenceThreshold(0.5)
 detectionNetwork.setNumClasses(80)
@@ -100,7 +99,6 @@ detectionNetwork.setIouThreshold(0.5)
 # detectionNetwork.setBlobPath(nnPath)
 detectionNetwork.setNumInferenceThreads(2)
 detectionNetwork.input.setBlocking(False)
-###
 
 objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
@@ -248,10 +246,17 @@ with dai.Device(pipeline) as device:
             except:
                 label = t.label
 
-            cv2.putText(trackerFrame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.putText(trackerFrame, t.status.name, (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            cv2.rectangle(trackerFrame, (x1, y1), (x2, y2), color, cv2.FONT_HERSHEY_SIMPLEX)
+            ####
+            tStatusName = t.status.name
+
+            if tStatusName == 'TRACKED':
+
+                cv2.putText(trackerFrame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(trackerFrame, t.status.name, (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.rectangle(trackerFrame, (x1, y1), (x2, y2), color, cv2.FONT_HERSHEY_SIMPLEX)
+            ####
+
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
