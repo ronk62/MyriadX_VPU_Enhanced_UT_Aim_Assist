@@ -260,10 +260,10 @@ with dai.Device(pipeline) as device:
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
 
-        # ## Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        ## Show Latency in miliseconds 
+        latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
+        diffs = np.append(diffs, latencyMs)
+        print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
  
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
@@ -294,10 +294,10 @@ with dai.Device(pipeline) as device:
         dtTrackletsData, previous_time = deltaT(previous_time)
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
-        # ## Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        ## Show Latency in miliseconds 
+        latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+        diffs = np.append(diffs, latencyMs)
+        print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
         ## use with PIL version
         # cv2.imshow("tracker", trackerFrame)
