@@ -71,21 +71,24 @@ Results:
 ## mobilenet ssd label texts
 # labelMap = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-## yolo v3 tiny label texts
-# labelMap = [    "person",         "bicycle",    "car",           "motorbike",     "aeroplane",   "bus",           "train",    "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",   "parking meter", "bench",    "bird",           "cat",        "dog",           "horse",         "sheep",       "cow",           "elephant",    "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",    "handbag",       "tie",    "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball", "kite",          "baseball bat",    "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",      "wine glass",    "cup",    "fork",           "knife",      "spoon",         "bowl",          "banana",      "apple",         "sandwich",    "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",       "donut",         "cake",    "chair",          "sofa",       "pottedplant",   "bed",           "diningtable", "toilet",        "tvmonitor",    "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",  "microwave",     "oven",    "toaster",        "sink",       "refrigerator",  "book",          "clock",       "vase",          "scissors",    "teddy bear",     "hair drier", "toothbrush"]
-
 ## person-detection-retail-0013 label texts
 labelMap = [ "person", "" ]
+
+## yolo v3 tiny label texts
+# labelMap = [    "person",         "bicycle",    "car",           "motorbike",     "aeroplane",   "bus",           "train",    "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",   "parking meter", "bench",    "bird",           "cat",        "dog",           "horse",         "sheep",       "cow",           "elephant",    "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",    "handbag",       "tie",    "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball", "kite",          "baseball bat",    "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",      "wine glass",    "cup",    "fork",           "knife",      "spoon",         "bowl",          "banana",      "apple",         "sandwich",    "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",       "donut",         "cake",    "chair",          "sofa",       "pottedplant",   "bed",           "diningtable", "toilet",        "tvmonitor",    "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",  "microwave",     "oven",    "toaster",        "sink",       "refrigerator",  "book",          "clock",       "vase",          "scissors",    "teddy bear",     "hair drier", "toothbrush"]
 
 
 nnPathDefault = str((Path(__file__).parent / Path('./models/person-detection-retail-0013_openvino_2021.4_6shave.blob')).resolve().absolute())
 parser = argparse.ArgumentParser()
-parser.add_argument('nnPath', nargs='?', help="Path to mobilenet detection network blob", default=nnPathDefault)
+parser.add_argument('nnPath', nargs='?', help="Path to detection network blob", default=nnPathDefault)
 
 args = parser.parse_args()
 
 # Create pipeline
 pipeline = dai.Pipeline()
+
+# This might improve reducing the latency on some systems
+pipeline.setXLinkChunkSize(0)
 
 # Define sources and outputs
 manip = pipeline.create(dai.node.ImageManip)
@@ -107,9 +110,9 @@ nnOut.setStreamName("nn")
 # Properties
 xinFrame.setMaxDataSize(1920*1080*3)
 
-manip.initialConfig.setResizeThumbnail(544, 320)  # for nn person-detection-retail-0013_openvino_2021
-# manip.initialConfig.setResizeThumbnail(300, 300)    # changed size to accomodate nn mobilenet-ssd_openvino_2021
-# manip.initialConfig.setResizeThumbnail(416, 416)    # changed size to accomodate nn yolo-v3-tiny-tf_openvino_2021
+# manip.initialConfig.setResizeThumbnail(300, 300)    # change size to accomodate nn mobilenet-ssd
+manip.initialConfig.setResizeThumbnail(544, 320)  # for nn person-detection-retail-0013
+# manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
 # manip.initialConfig.setResize(384, 384)
 # manip.initialConfig.setKeepAspectRatio(False) #squash the image to not lose FOV
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
@@ -124,7 +127,9 @@ detectionNetwork.input.setBlocking(True)
 objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
 objectTracker.inputDetections.setBlocking(True)
-objectTracker.setDetectionLabelsToTrack([1])  # track only person
+## select for correct model
+# objectTracker.setDetectionLabelsToTrack([15])  # track only person - mobilenet-ssd 
+objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
@@ -143,6 +148,8 @@ objectTracker.passthroughTrackerFrame.link(xlinkOut.input)
 
 # Connect and start the pipeline
 with dai.Device(pipeline) as device:
+
+    print(device.getUsbSpeed())
 
     qIn = device.getInputQueue(name="inFrame")
     trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=4)
@@ -195,6 +202,8 @@ with dai.Device(pipeline) as device:
     # inputFrameShape = (1920, 1080)
     inputFrameShape = (1600, 900)
 
+    diffs = np.array([])
+
     while True:
         previous_time = 0
         initTime, previous_time = deltaT(previous_time)
@@ -235,7 +244,13 @@ with dai.Device(pipeline) as device:
 
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
-        # displayFrame("nn", manipFrame)
+
+        # Show Latency in miliseconds 
+        latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
+        diffs = np.append(diffs, latencyMs)
+        print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+ 
+        displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
         eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)
 
@@ -264,6 +279,11 @@ with dai.Device(pipeline) as device:
         dtTrackletsData, previous_time = deltaT(previous_time)
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
+        # Show Latency in miliseconds 
+        latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+        diffs = np.append(diffs, latencyMs)
+        print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+
         ## use with PIL version
         # cv2.imshow("tracker", trackerFrame)
 
@@ -285,8 +305,8 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
