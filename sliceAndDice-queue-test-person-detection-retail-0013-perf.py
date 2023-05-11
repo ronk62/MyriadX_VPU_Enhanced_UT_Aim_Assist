@@ -73,6 +73,12 @@ Results:
 - all queues set to maxSize=1, blocking=False
 
 Results:
+- dtCapFrame: 0.013970613479614258 eFPScapFrame: 71.57881290469987
+- dtNNdetections: 0.018477916717529297 eFPSnnDetections: 54.11865207362289
+- dtTrackletsData: 0.008976936340332031 eFPStrackletsData: 111.39656678978366
+- dtImshow: 0.004983663558959961 eFPSimshow: 200.65555941202624
+- fullLoopTime: 0.04640913009643555 eFPSfullLoopTime: 21.547483789818358
+
 - approx 0.6 seconds latency; better but still not good enough
 
 '''
@@ -314,8 +320,8 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
