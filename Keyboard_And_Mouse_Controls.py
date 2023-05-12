@@ -8,7 +8,16 @@ import time
 # import win32com.client as comclt
 import win32api, win32con, win32gui, win32ui
 import keyboard
+import math
 
+'''
+ref. https://www.unknowncheats.me/forum/apex-legends/495561-calculate-mouse-movement-value.html
+'''
+gameScrnWidth = 1600
+gameScrnHeight = 900
+UT99FOV = 90
+UT99sens = 1
+UTfull360 = 16363.0 / UT99sens
 
 SendInput = ctypes.windll.user32.SendInput
 
@@ -65,10 +74,43 @@ def click():
     time.sleep(0.001)
     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,0,0,0,0)
 
-
+'''
 def AimMouseAlt(target):
     offsetY, offsetX = target
     y_distance = int(((offsetY - 400)/400) * 40)
     x_distance = int(((offsetX - 750)/750) * 80)
+    print(y_distance, x_distance)
+    win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, x_distance, y_distance, 0, 0)
+'''
+
+def RealFov(fov, width, height):
+    raspectRatio = (width / height) / (4/3)
+    rFovRad = 2 * math.atan(math.tan(math.radians(fov * 0.5)) * raspectRatio)
+    rFovDeg = math.degrees(rFovRad)
+    return rFovDeg
+
+def coord2deg (delta, fov, width):
+    coordRad = math.atan(((delta * 2) / width) * math.tan(math.radians(fov * 0.5)))
+    coordDeg = math.degrees(coordRad)
+    return coordDeg
+
+'''
+ref.
+gameScrnWidth = 1600
+gameScrnHeight = 900
+UT99FOV = 90
+UT99sens = 1
+UTfull360 = 16363.0 / UT99sens
+'''
+def AimMouseAlt(target):
+    offsetY, offsetX = target
+    realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
+    yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
+    pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
+
+    # y_distance = int(pitch * (UTfull360 / 360))
+    y_distance = int(pitch)
+    # x_distance = int(yaw * (UTfull360 / 360))
+    x_distance = int(yaw)
     print(y_distance, x_distance)
     win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, x_distance, y_distance, 0, 0)
