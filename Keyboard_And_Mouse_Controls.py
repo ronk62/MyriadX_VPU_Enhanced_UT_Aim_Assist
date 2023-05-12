@@ -69,6 +69,6 @@ def click():
 def AimMouseAlt(target):
     offsetY, offsetX = target
     y_distance = int(((offsetY - 400)/400) * 40)
-    x_distance = int(((offsetX - 800)/800) * 80)
+    x_distance = int(((offsetX - 750)/750) * 80)
     print(y_distance, x_distance)
     win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, x_distance, y_distance, 0, 0)
