@@ -10,6 +10,9 @@ import argparse
 from Keyboard_And_Mouse_Controls import *
 import dxcam
 
+'''
+ref. https://github.com/ra1nty/DXcam
+'''
 camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
 
 '''
@@ -238,12 +241,14 @@ with dai.Device(pipeline) as device:
                 bbox_width = (x2 - x1)
                 bbox_xcenter = x1 + bbox_width/2
 
+                
                 if bbox_ycenter > 200 and bbox_ycenter < 700:
-                    if bbox_xcenter > 450 and bbox_ycenter < 1150:
+                    if bbox_xcenter > 450 and bbox_xcenter < 1150:
                         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
 
-                        print(target)
+                        
                         if keyboard.is_pressed(45):
+                            print(target)
                             ## move mouse to point at target
                             AimMouseAlt(target)
                             # fire at target 3 times
