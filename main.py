@@ -7,6 +7,7 @@ import numpy as np
 import time
 import argparse
 # from PIL import ImageGrab, Image
+from Keyboard_And_Mouse_Controls import *
 import dxcam
 
 camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
@@ -230,8 +231,28 @@ with dai.Device(pipeline) as device:
                 cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 cv2.putText(trackerFrame, t.status.name, (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 cv2.rectangle(trackerFrame, (x1, y1), (x2, y2), color, cv2.FONT_HERSHEY_SIMPLEX)
-            ####
 
+                bbox_height = (y2 - y1)
+                bbox_ycenter = y1 + bbox_height/2
+                
+                bbox_width = (x2 - x1)
+                bbox_xcenter = x1 + bbox_width/2
+
+                if bbox_ycenter > 200 and bbox_ycenter < 700:
+                    if bbox_xcenter > 450 and bbox_ycenter < 1150:
+                        target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
+
+                        print(target)
+                        if keyboard.is_pressed(45):
+                            ## move mouse to point at target
+                            AimMouseAlt(target)
+                            # fire at target 3 times
+                            # print(target)
+                            click()
+                            click()
+                            click()
+
+        ####
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
