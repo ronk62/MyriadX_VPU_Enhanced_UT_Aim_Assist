@@ -6,7 +6,7 @@ import depthai as dai
 import numpy as np
 import time
 import argparse
-from PIL import ImageGrab, Image
+# from PIL import ImageGrab, Image
 import dxcam
 
 camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
@@ -30,18 +30,9 @@ Results:
 
 '''
 
-## mobilenet ssd label texts
-# labelMap = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
-
-## person-detection-retail-0013 label texts
-# labelMap = [ "person", "" ]
-
 ## yolo v3 tiny label texts
 labelMap = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
 
-
-# nnPathDefault = str((Path(__file__).parent / Path('./models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
-# nnPathDefault = str((Path(__file__).parent / Path('./models/person-detection-retail-0013_openvino_2021.4_6shave.blob')).resolve().absolute())
 nnPathDefault = str((Path(__file__).parent / Path('./models/yolo-v3-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
 parser = argparse.ArgumentParser()
 parser.add_argument('nnPath', nargs='?', help="Path to detection network blob", default=nnPathDefault)
@@ -57,7 +48,6 @@ pipeline.setXLinkChunkSize(0)
 # Define sources and outputs
 manip = pipeline.create(dai.node.ImageManip)
 objectTracker = pipeline.create(dai.node.ObjectTracker)
-# detectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork) # mobilenet-ssd and person-detection-retail-0013
 detectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork) # yolo-v3-tiny-tf
 
 manipOut = pipeline.create(dai.node.XLinkOut)
@@ -75,37 +65,27 @@ nnOut.setStreamName("nn")
 # Properties
 xinFrame.setMaxDataSize(1920*1080*3)
 
-# manip.initialConfig.setResizeThumbnail(300, 300)    # change size to accomodate nn mobilenet-ssd
-# manip.initialConfig.setResizeThumbnail(544, 320)  # for nn person-detection-retail-0013
 manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
-# manip.initialConfig.setResize(384, 384)
-# manip.initialConfig.setKeepAspectRatio(False) #squash the image to not lose FOV
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 manip.inputImage.setBlocking(True)
 
-# setting node configs
+## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
 detectionNetwork.setConfidenceThreshold(0.75)
 detectionNetwork.input.setBlocking(True)
 
-## Network specific settings for yolo-v3-tiny-tf
-# detectionNetwork.setConfidenceThreshold(0.5)
 detectionNetwork.setNumClasses(80)
 detectionNetwork.setCoordinateSize(4)
 detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319])
 detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
-# detectionNetwork.setBlobPath(nnPath)
 detectionNetwork.setNumInferenceThreads(2)
 detectionNetwork.input.setBlocking(False)
 
 objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
 objectTracker.inputDetections.setBlocking(True)
-## select for correct model
-# objectTracker.setDetectionLabelsToTrack([15])  # track only person - mobilenet-ssd 
-# objectTracker.setDetectionLabelsToTrack([1])  # track only person - person-detection-retail-0013
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
@@ -158,11 +138,6 @@ with dai.Device(pipeline) as device:
         cv2.imshow(name, frame)
     
 
-    def capture_window_PIL():
-        # UT game in 1278 x 686 windowed mode
-        image =  np.array(ImageGrab.grab(bbox=(0,0,1600,900)))
-        return image
-    
     def capture_window_dxcam():
         # UT game in 1278 x 686 windowed mode
         image = np.array(camera.grab([0, 0, 1600, 900]))
@@ -223,9 +198,9 @@ with dai.Device(pipeline) as device:
         manipFrame = manip.getCvFrame()
 
         ## Show Latency in miliseconds 
-        latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
-        diffs = np.append(diffs, latencyMs)
-        print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        # latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
+        # diffs = np.append(diffs, latencyMs)
+        # print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
  
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
@@ -264,16 +239,10 @@ with dai.Device(pipeline) as device:
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
         ## Show Latency in miliseconds 
-        latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        diffs = np.append(diffs, latencyMs)
-        print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+        # diffs = np.append(diffs, latencyMs)
+        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
-        ## use with PIL version
-        # cv2.imshow("tracker", trackerFrame)
-
-        # if cv2.waitKey(1) == ord('q'):
-        #     break
-        
         ## use with dxcam version
         if frame.size > 1:
             cv2.imshow("tracker", trackerFrame)
@@ -289,8 +258,8 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
