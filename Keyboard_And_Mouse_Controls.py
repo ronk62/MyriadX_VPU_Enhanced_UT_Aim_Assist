@@ -108,9 +108,9 @@ def AimMouseAlt(target):
     yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
     pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
 
-    # y_distance = int(pitch * (UTfull360 / 360))
+    # y_distance = int(pitch * (UTfull360 / 360))   # WAY too much gain
     y_distance = int(pitch)
-    # x_distance = int(yaw * (UTfull360 / 360))
+    # x_distance = int(yaw * (UTfull360 / 360))     # WAY too much gain
     x_distance = int(yaw)
     print(y_distance, x_distance)
     win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, x_distance, y_distance, 0, 0)
