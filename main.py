@@ -276,7 +276,11 @@ with dai.Device(pipeline) as device:
                     xErrorSum += xErrorLast
 
                 if keyboard.is_pressed(45):
-                    print(target)
+                    print("target is -> ", target)
+                    print("yErrorLast is -> ", yErrorLast)
+                    print("yErrorSum is -> ", yErrorSum)
+                    print("xErrorLast is -> ", xErrorLast)
+                    print("xErrorSum is -> ", xErrorSum)
                     
                     ## move mouse to point at target
                     AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast)     # add pid controller
@@ -292,10 +296,10 @@ with dai.Device(pipeline) as device:
                 ##
 
         if trackedCount == 0:
-                ## re-initialize some targeting pid vars
-                pidTargetPrev = (0, 0)
-                yErrorSum = 0
-                xErrorSum = 0
+            ## re-initialize some targeting pid vars
+            pidTargetPrev = (0, 0)
+            yErrorSum = 0
+            xErrorSum = 0
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 

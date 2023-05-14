@@ -45,6 +45,37 @@ UTfull360 = 16363.0 / UT99sens
 '''
 def AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast):
     offsetY, offsetX = target
+
+    ## add pid controller
+    # pid values
+    Kp = 1.0
+    Ki = 0.0
+    Kd = 0.0
+    iX = Ki * xErrorSum
+    dX = Kd * xErrorLast
+    iY = Ki * yErrorSum
+    dY = Kd * yErrorLast
+
+    offsetYpid = int((offsetY * Kp) + (offsetY * iY) + (offsetY * dY))  # add pid
+    offsetXpid = int((offsetX * Kp) + (offsetX * iX) + (offsetX * dX))  # add pid
+
+    realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
+
+    yaw = coord2deg(offsetXpid - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
+    pitch = coord2deg(offsetYpid - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
+
+    y_distance = int((pitch * 0.6))
+    x_distance = int((yaw * 0.65))
+
+    print("y_distance, x_distance ", y_distance, x_distance)
+    # Move pointer relative to current position
+    mouse.move(x_distance, y_distance)
+
+'''
+save for ref only
+
+def AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast):
+    offsetY, offsetX = target
     realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
 
     yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
@@ -53,34 +84,18 @@ def AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast):
     ## add pid controller
     # pid values
     Kp = 0.6
-    Ki = 0.3
-    Kd = 0.3
+    Ki = 0.0
+    Kd = 0.0
     iX = Ki * xErrorSum
     dX = Kd * xErrorLast
     iY = Ki * yErrorSum
     dY = Kd * yErrorLast
     # y_distance = int(pitch * 0.60)
-    y_distance = int((pitch * Kp) + (pitch * iX) + (pitch * dX))      # add pid
+    y_distance = int((pitch * Kp) + (pitch * iY) + (pitch * dY))      # add pid
     # x_distance = int(yaw * 0.65)
-    x_distance = int((yaw * Kp) + (yaw * iY) + (yaw * dY))            # add pid
+    x_distance = int((yaw * Kp) + (yaw * iX) + (yaw * dX))            # add pid
 
-    print(y_distance, x_distance)
+    print("y_distance, x_distance ", y_distance, x_distance)
     # Move pointer relative to current position
     mouse.move(x_distance, y_distance)
-
-'''
-save for ref only, deprecated by pynput
-
-def AimMouseAlt(target):
-    offsetY, offsetX = target
-    realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
-    yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
-    pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
-
-    # y_distance = int(pitch * (UTfull360 / 360))   # WAY too much gain
-    y_distance = int(pitch)
-    # x_distance = int(yaw * (UTfull360 / 360))     # WAY too much gain
-    x_distance = int(yaw)
-    print(y_distance, x_distance)
-    win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, x_distance, y_distance, 0, 0)
 '''
