@@ -11,6 +11,16 @@ from Keyboard_And_Mouse_Controls import *
 import dxcam
 
 '''
+Next steps:
+- remove current pid design
+- replace with process get speed and trajectory of target (dx, dy, dt) and
+  lead the target
+- perhaps add some addaptive error correction and gains (like a pid controller would)
+- perhaps attempt the design that uses mouse movement velocity and position error
+  to gage target lock and fire (Kody's idea)
+'''
+
+'''
 ref. https://github.com/ra1nty/DXcam
 '''
 camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
