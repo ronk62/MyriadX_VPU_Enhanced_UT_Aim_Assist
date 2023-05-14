@@ -160,6 +160,11 @@ with dai.Device(pipeline) as device:
 
     diffs = np.array([])
 
+    ## initialize some targeting pid vars
+    pidTargetPrev = (0, 0)
+    yErrorSum = 0
+    xErrorSum = 0
+
     while True:
         previous_time = 0
         initTime, previous_time = deltaT(previous_time)
@@ -213,6 +218,9 @@ with dai.Device(pipeline) as device:
         color = (255, 0, 0)
         trackerFrame = trackFrame.getCvFrame()
         trackletsData = track.tracklets
+
+        trackedCount = 0
+
         for t in trackletsData:
             roi = t.roi.denormalize(trackerFrame.shape[1], trackerFrame.shape[0])
             x1 = int(roi.topLeft().x)
@@ -225,10 +233,10 @@ with dai.Device(pipeline) as device:
             except:
                 label = t.label
 
-            ####
             tStatusName = t.status.name
 
             if tStatusName == 'TRACKED':
+                trackedCount += 1
 
                 cv2.putText(trackerFrame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
@@ -260,18 +268,34 @@ with dai.Device(pipeline) as device:
 
                 ## uncomment for dev and test only
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
+
+                if pidTargetPrev != (0, 0):
+                    yErrorLast = (target[0] - pidTargetPrev[0])
+                    xErrorLast = (target[1] - pidTargetPrev[1])
+                    yErrorSum += yErrorLast
+                    xErrorSum += xErrorLast
+
                 if keyboard.is_pressed(45):
                     print(target)
+                    
                     ## move mouse to point at target
-                    AimMouseAlt(target)
+                    AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast)     # add pid controller
+                    
                     # fire at target 3 times
                     # print(target)
                     click()
                     click()
                     click()
+                
+                ## setup var for next iteration
+                pidTargetPrev = target
                 ##
 
-        ####
+        if trackedCount == 0:
+                ## re-initialize some targeting pid vars
+                pidTargetPrev = (0, 0)
+                yErrorSum = 0
+                xErrorSum = 0
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
