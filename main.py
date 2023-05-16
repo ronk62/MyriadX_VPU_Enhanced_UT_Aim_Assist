@@ -13,7 +13,7 @@ import dxcam
 '''
 Next steps:
 - remove current pid design
-- replace with process get speed and trajectory of target (dx, dy, dt) and
+- replace with process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
 - perhaps add some addaptive error correction and gains (like a pid controller would)
 - perhaps attempt the design that uses mouse movement velocity and position error
@@ -170,10 +170,11 @@ with dai.Device(pipeline) as device:
 
     diffs = np.array([])
 
-    ## initialize some targeting pid vars
-    pidTargetPrev = (0, 0)
-    yErrorSum = 0
-    xErrorSum = 0
+    ## initialize some 'lead the target' vars
+    prevTarget = (0, 0)
+    initTargetSpeedCalc = False
+    xTargetSpeed = 0
+    yTargetSpeed = 0
 
     while True:
         previous_time = 0
@@ -259,7 +260,7 @@ with dai.Device(pipeline) as device:
                 bbox_width = (x2 - x1)
                 bbox_xcenter = x1 + bbox_width/2
 
-                ## uncomment for regular use
+                ## uncomment for ROI targeting use
                 # if bbox_ycenter > 200 and bbox_ycenter < 700:
                 #     if bbox_xcenter > 450 and bbox_xcenter < 1150:
                 #         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
@@ -276,24 +277,35 @@ with dai.Device(pipeline) as device:
                 #             click()
                 ##
 
-                ## uncomment for dev and test only
-                target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
+                ## uncomment for full screen targeting
+                target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
+                
+                ## for testing
+                print("target before lead = ", target)
+                
+                if initTargetSpeedCalc:
+                    prevTargetY, prevTargetX = prevTarget
+                    targetY, targetX = target
+                    dY = targetY - prevTargetY
+                    dX = targetX - prevTargetX
+                    dT = initTime - previous_InitTime
 
-                if pidTargetPrev != (0, 0):
-                    yErrorLast = (target[0] - pidTargetPrev[0])
-                    xErrorLast = (target[1] - pidTargetPrev[1])
-                    yErrorSum += yErrorLast
-                    xErrorSum += xErrorLast
+                    targetSpeedY =  dY / dT
+                    targetSpeedX =  dX / dT
+                    targetLeadY = targetY + (targetSpeedY * dT)
+                    targetLeadX = targetX + (targetSpeedX * dT)
+
+                    target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+
+                    ## for testing
+                    print("target after lead = ", target)
+
 
                 if keyboard.is_pressed(45):
                     print("target is -> ", target)
-                    print("yErrorLast is -> ", yErrorLast)
-                    print("yErrorSum is -> ", yErrorSum)
-                    print("xErrorLast is -> ", xErrorLast)
-                    print("xErrorSum is -> ", xErrorSum)
                     
                     ## move mouse to point at target
-                    AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast)     # add pid controller
+                    AimMouseAlt(target)
                     
                     # fire at target 3 times
                     # print(target)
@@ -302,14 +314,16 @@ with dai.Device(pipeline) as device:
                     click()
                 
                 ## setup var for next iteration
-                pidTargetPrev = target
+                initTargetSpeedCalc = True
+                previous_InitTime = initTime
+                prevTarget = target
                 ##
 
         if trackedCount == 0:
             ## re-initialize some targeting pid vars
-            pidTargetPrev = (0, 0)
-            yErrorSum = 0
-            xErrorSum = 0
+            initTargetSpeedCalc = False
+            xTargetSpeed = 0
+            yTargetSpeed = 0
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 

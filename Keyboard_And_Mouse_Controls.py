@@ -43,26 +43,13 @@ UT99FOV = 90
 UT99sens = 1
 UTfull360 = 16363.0 / UT99sens
 '''
-def AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast):
+def AimMouseAlt(target):
     offsetY, offsetX = target
-
-    ## add pid controller
-    # pid values
-    Kp = 1.0
-    Ki = 0.0
-    Kd = 0.0
-    iX = Ki * xErrorSum
-    dX = Kd * xErrorLast
-    iY = Ki * yErrorSum
-    dY = Kd * yErrorLast
-
-    offsetYpid = int((offsetY * Kp) + (offsetY * iY) + (offsetY * dY))  # add pid
-    offsetXpid = int((offsetX * Kp) + (offsetX * iX) + (offsetX * dX))  # add pid
 
     realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
 
-    yaw = coord2deg(offsetXpid - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
-    pitch = coord2deg(offsetYpid - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
+    yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
+    pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
 
     y_distance = int((pitch * 0.6))
     x_distance = int((yaw * 0.65))
