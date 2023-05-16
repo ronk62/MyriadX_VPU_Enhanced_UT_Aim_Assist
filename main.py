@@ -175,6 +175,7 @@ with dai.Device(pipeline) as device:
     initTargetSpeedCalc = False
     xTargetSpeed = 0
     yTargetSpeed = 0
+    leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row
 
     while True:
         previous_time = 0
@@ -279,7 +280,7 @@ with dai.Device(pipeline) as device:
 
                 ## uncomment for full screen targeting
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
-                
+                '''
                 ## for testing
                 print("target before lead = ", target)
                 
@@ -288,7 +289,7 @@ with dai.Device(pipeline) as device:
                     targetY, targetX = target
                     dY = targetY - prevTargetY
                     dX = targetX - prevTargetX
-                    dT = initTime - previous_InitTime
+                    dT = (initTime - previous_InitTime) + 0.0000000001
 
                     targetSpeedY =  dY / dT
                     targetSpeedX =  dX / dT
@@ -300,30 +301,64 @@ with dai.Device(pipeline) as device:
                     ## for testing
                     print("target after lead = ", target)
 
+                    '''
+
+                ####
 
                 if keyboard.is_pressed(45):
-                    print("target is -> ", target)
+                                        
+                    if initTargetSpeedCalc:
+                        leadTargFrameCount += 1
+
+                        if leadTargFrameCount == 1:
+                            prevTargetY, prevTargetX = prevTarget
+                            previous_InitTime = initTime
+                        
+                        if leadTargFrameCount == 5:
+                            targetY, targetX = target
+                            dY = targetY - prevTargetY
+                            dX = targetX - prevTargetX
+                            dT = (initTime - previous_InitTime) + 0.0000000001
+
+                            targetSpeedY =  dY / dT
+                            targetSpeedX =  dX / dT
+                            targetLeadY = targetY + (1.7 * (targetSpeedY * dT))
+                            targetLeadX = targetX + (1.7 * (targetSpeedX * dT))
+
+                            ## for testing
+                            print("target before lead applied = ", target)
+
+                            target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+
+                            ## for testing
+                            print("target after lead applied = ", target)
+
+
+                            print("target is -> ", target)
+                            
+                            ## move mouse to point at target
+                            AimMouseAlt(target)
+                            
+                            # fire at target 3 times
+                            # print(target)
+                            click()
+                            click()
+                            click()
+
+                            leadTargFrameCount = 0  # reset to 0 for next cycle
                     
-                    ## move mouse to point at target
-                    AimMouseAlt(target)
-                    
-                    # fire at target 3 times
-                    # print(target)
-                    click()
-                    click()
-                    click()
                 
                 ## setup var for next iteration
                 initTargetSpeedCalc = True
-                previous_InitTime = initTime
                 prevTarget = target
                 ##
 
         if trackedCount == 0:
-            ## re-initialize some targeting pid vars
+            ## re-initialize some targeting vars
             initTargetSpeedCalc = False
             xTargetSpeed = 0
             yTargetSpeed = 0
+            leadTargFrameCount = 0
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
