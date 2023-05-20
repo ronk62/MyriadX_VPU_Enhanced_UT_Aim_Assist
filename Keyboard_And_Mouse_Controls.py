@@ -56,7 +56,7 @@ def AimMouseAlt(target):
 
     print("y_distance, x_distance ", y_distance, x_distance)
     # Move pointer relative to current position
-    # mouse.move(x_distance, y_distance)
+    mouse.move(x_distance, y_distance)
 
 '''
 save for ref only

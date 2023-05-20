@@ -328,7 +328,7 @@ with dai.Device(pipeline) as device:
                         dY = targetY - prevTargetY
                         dX = targetX - prevTargetX
                         # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
-                        dT = (time.time() - dTprevTack) + 0.0000000001  # loop time from while loop - not correct for this calc
+                        dT = (time.time() - dTprevTack) + 0.9000000001  # loop time from while loop - not correct for this calc
                         # time.sleep(1)
                         dTprevTack = time.time()
 
@@ -370,8 +370,8 @@ with dai.Device(pipeline) as device:
 
                 ####
 
-                    # if keyboard.is_pressed(45):
-                    if True:
+                    if keyboard.is_pressed(45):
+                    # if True:
                                             
                         # if initTargetSpeedCalc:
                         #     leadTargFrameCount += 1
@@ -423,10 +423,10 @@ with dai.Device(pipeline) as device:
                                 AimMouseAlt(target)
                                 
                                 # fire at target 3 times
-                                # print(target)
-                                # click()
-                                # click()
-                                # click()
+                                print(target)
+                                click()
+                                click()
+                                click()
                     
                 
                 ## setup var for next iteration
