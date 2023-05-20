@@ -51,12 +51,12 @@ def AimMouseAlt(target):
     yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
     pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
 
-    y_distance = int((pitch * 0.6))
-    x_distance = int((yaw * 0.65))
+    y_distance = int((pitch * 1))
+    x_distance = int((yaw * 1))
 
     print("y_distance, x_distance ", y_distance, x_distance)
     # Move pointer relative to current position
-    mouse.move(x_distance, y_distance)
+    # mouse.move(x_distance, y_distance)
 
 '''
 save for ref only
