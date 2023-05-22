@@ -175,7 +175,7 @@ with dai.Device(pipeline) as device:
     initTargetSpeedCalc = False
     xTargetSpeed = 0
     yTargetSpeed = 0
-    leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row
+    leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row ???
 
     while True:
         previous_time = 0
@@ -208,6 +208,15 @@ with dai.Device(pipeline) as device:
         manip = qManip.get()
         inDet = qDet.get()
 
+        # ###
+        # testLatency = inDet.getTimestamp()
+        # testDaiClockNow = dai.Clock.now()
+        # deltaTlatency = testDaiClockNow - testLatency
+        # print("testLatency = ", testLatency)
+        # print("testDaiClockNow = ", testDaiClockNow)
+        # print("deltaTlatency = ", deltaTlatency)
+        # ###
+
         counter+=1
         current_time = time.monotonic()
         if (current_time - startTime) > 1 :
@@ -218,8 +227,17 @@ with dai.Device(pipeline) as device:
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
 
-        ## Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - manip.getTimestamp()).total_seconds() * 1000
+        # ###
+        # testLatency = inDet.getTimestamp()
+        # testDaiClockNow = dai.Clock.now()
+        # deltaTlatency = testDaiClockNow - testLatency
+        # print("testLatency = ", testLatency)
+        # print("testDaiClockNow = ", testDaiClockNow)
+        # print("deltaTlatency = ", deltaTlatency)
+        # ###
+
+        # # Show Latency in miliseconds 
+        # latencyMs = (dai.Clock.now() - inDet.getTimestamp()).total_seconds() * 1000
         # diffs = np.append(diffs, latencyMs)
         # print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
  
@@ -310,22 +328,39 @@ with dai.Device(pipeline) as device:
                     if initTargetSpeedCalc:
                         leadTargFrameCount += 1
 
-                        if leadTargFrameCount == 1:
+                        if leadTargFrameCount >= 1:
                             prevTargetY, prevTargetX = prevTarget
                             previous_InitTime = initTime
                         
-                        if leadTargFrameCount == 5:
+                        if leadTargFrameCount >= 7:
                             targetY, targetX = target
                             dY = targetY - prevTargetY
                             dX = targetX - prevTargetX
-                            dT = (initTime - previous_InitTime) + 0.0000000001
+                            # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
+                            
+                            # tNow = dai.Clock.now()
+                            # tDetFrameManipSecs = manip.getTimestamp()
+                            # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
+
+                            dT = 5.5    # fixed val, based on analysis
 
                             targetSpeedY =  dY / dT
                             targetSpeedX =  dX / dT
-                            targetLeadY = targetY + (1.7 * (targetSpeedY * dT))
-                            targetLeadX = targetX + (1.7 * (targetSpeedX * dT))
+                            # targetLeadY = targetY + (1 * (targetSpeedY * dT))
+                            targetLeadY = targetY + dT * dY
+                            # targetLeadX = targetX + (1 * (targetSpeedX * dT))
+                            targetLeadX = targetX + dT * dX
 
                             ## for testing
+                            # print("tNow = ", tNow)
+                            # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
+                            print("dY = ", dY)
+                            print("dX = ", dX)
+                            print("dT = ", dT)
+                            # print("targetSpeedY = ", targetSpeedY)
+                            # print("targetSpeedX = ", targetSpeedX)
+                            print("targetLeadY = ", targetLeadY)
+                            print("targetLeadX = ", targetLeadX)
                             print("target before lead applied = ", target)
 
                             target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
