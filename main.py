@@ -12,12 +12,9 @@ import dxcam
 
 '''
 Next steps:
-- remove current pid design
-- replace with process to get speed and trajectory of target (dx, dy, dt) and
+- introduce process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
 - perhaps add some addaptive error correction and gains (like a pid controller would)
-- perhaps attempt the design that uses mouse movement velocity and position error
-  to gage target lock and fire (Kody's idea)
 '''
 
 '''
@@ -176,12 +173,23 @@ with dai.Device(pipeline) as device:
     xTargetSpeed = 0
     yTargetSpeed = 0
     leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row ???
+    firstLoopInitT = time.time()
+    frameCount = 0
+    firstFrameToTargT = 0
+    dTfirstFrameToTarget = 0
 
     while True:
         previous_time = time.time()
         initTime, previous_time = deltaT(previous_time)
         # frame = capture_window_PIL()
         frame = capture_window_dxcam()
+
+        ###
+        frameCount += 1
+        if frameCount == 1:
+            firstFrameToTargT = time.time()
+        ###
+
         dtCapFrame, previous_time = deltaT(previous_time)
         eFPScapFrame = 1 / (dtCapFrame + 0.000000001)
 
@@ -284,65 +292,82 @@ with dai.Device(pipeline) as device:
                 #     if bbox_xcenter > 450 and bbox_xcenter < 1150:
                 #         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
 
+                        
+                #         if keyboard.is_pressed(45):
+                #             print(target)
+                #             ## move mouse to point at target
+                #             AimMouseAlt(target)
+                #             # fire at target 3 times
+                #             # print(target)
+                #             click()
+                #             click()
+                #             click()
+                ##
+
+                dTfirstFrameToTarget = time.time() - firstFrameToTargT
+                dTfirstLoopInit = time.time() - firstLoopInitT
+
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
 
-                if keyboard.is_pressed(45):
-                                        
-                    if initTargetSpeedCalc:
-                        leadTargFrameCount += 1
+                ## for testing
+                if initTargetSpeedCalc:
+                    leadTargFrameCount += 1
+                    if leadTargFrameCount == 1:
+                        dTprevTack = time.time()    # capture time of first occurence of a track in a series
 
-                        if leadTargFrameCount >= 1:
-                            prevTargetY, prevTargetX = prevTarget
-                            previous_InitTime = initTime
+                    if leadTargFrameCount > 1:
+                        prevTargetY, prevTargetX = prevTarget
+
+                    
+                    if leadTargFrameCount >= 7:
+                        targetY, targetX = target
+                        dY = targetY - prevTargetY
+                        dX = targetX - prevTargetX
+                        dT = (time.time() - dTprevTack) + 0.9000000001  # track loop time from while loop - not correct for this calc
+                        # time.sleep(1)
+                        dTprevTack = time.time()    # capture time of all subsequent occurences of a track in a series
+
+                        targetSpeedY =  dY / dT
+                        targetSpeedX =  dX / dT
+                        # targetLeadY = targetY + (1 * (targetSpeedY * dT))
+                        targetLeadY = targetY + dT * dY
+                        # targetLeadX = targetX + (1 * (targetSpeedX * dT))
+                        targetLeadX = targetX + dT * dX
+
+                        prevTarget = target
+
+                        ## for testing
+                        print("dY = ", dY)
+                        print("dX = ", dX)
+                        print("dT = ", dT)
+                        print("targetSpeedY = ", targetSpeedY)
+                        print("targetSpeedX = ", targetSpeedX)
+                        print("targetLeadY = ", targetLeadY)
+                        print("targetLeadX = ", targetLeadX)
+                        print("target before lead applied = ", target)
+
+                        target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+
+                        ## for testing
+                        print("target after lead applied = ", target)
+
+
+                        print("target is -> ", target)
+
+
+                    if keyboard.is_pressed(45):
+                        ## move mouse to point at target
+                        AimMouseAlt(target)
                         
-                        if leadTargFrameCount >= 7:
-                            targetY, targetX = target
-                            dY = targetY - prevTargetY
-                            dX = targetX - prevTargetX
-                            
-                            dT = 5.5    # fixed val, based on analysis
-
-                            targetSpeedY =  dY / dT
-                            targetSpeedX =  dX / dT
-                            # targetLeadY = targetY + (1 * (targetSpeedY * dT))
-                            targetLeadY = targetY + dT * dY
-                            # targetLeadX = targetX + (1 * (targetSpeedX * dT))
-                            targetLeadX = targetX + dT * dX
-
-                            ## for testing
-                            print("dY = ", dY)
-                            print("dX = ", dX)
-                            print("dT = ", dT)
-                            # print("targetSpeedY = ", targetSpeedY)
-                            # print("targetSpeedX = ", targetSpeedX)
-                            print("targetLeadY = ", targetLeadY)
-                            print("targetLeadX = ", targetLeadX)
-                            print("target before lead applied = ", target)
-
-                            target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
-
-                            ## for testing
-                            print("target after lead applied = ", target)
-
-
-                            print("target is -> ", target)
-                            
-                            ## move mouse to point at target
-                            AimMouseAlt(target)
-                            
-                            # fire at target 3 times
-                            # print(target)
-                            click()
-                            click()
-                            click()
-
-                            leadTargFrameCount = 0  # reset to 0 for next cycle
+                        # fire at target 3 times
+                        print(target)
+                        click()
+                        click()
+                        click()
                     
                 
                 ## setup var for next iteration
                 initTargetSpeedCalc = True
-                prevTarget = target
-                ##
 
         if trackedCount == 0:
             ## re-initialize some targeting vars
@@ -356,10 +381,10 @@ with dai.Device(pipeline) as device:
         dtTrackletsData, previous_time = deltaT(previous_time)
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
-        ## Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        # Show Latency in miliseconds 
+        latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+        diffs = np.append(diffs, latencyMs)
+        print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
         ## use with dxcam version
         if frame.size > 1:
