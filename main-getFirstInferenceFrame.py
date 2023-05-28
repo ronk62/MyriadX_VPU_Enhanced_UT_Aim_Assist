@@ -171,7 +171,7 @@ with dai.Device(pipeline) as device:
     diffs = np.array([])
 
     ## initialize some 'lead the target' vars
-    prevTarget = (0, 0)
+    prevTarget = (450, 800)
     initTargetSpeedCalc = False
     xTargetSpeed = 0
     yTargetSpeed = 0
@@ -182,7 +182,7 @@ with dai.Device(pipeline) as device:
     dTfirstFrameToTarget = 0
 
     while True:
-        previous_time = 0
+        previous_time = time.time()
         initTime, previous_time = deltaT(previous_time)
         # frame = capture_window_PIL()
         frame = capture_window_dxcam()
@@ -310,33 +310,25 @@ with dai.Device(pipeline) as device:
                 dTfirstFrameToTarget = time.time() - firstFrameToTargT
                 dTfirstLoopInit = time.time() - firstLoopInitT
 
-                ## uncomment for full screen targeting
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
 
                 ## for testing
                 if initTargetSpeedCalc:
                     leadTargFrameCount += 1
                     if leadTargFrameCount == 1:
-                        dTprevTack = time.time()
+                        dTprevTack = time.time()    # capture time of first occurence of a track in a series
 
                     if leadTargFrameCount > 1:
                         prevTargetY, prevTargetX = prevTarget
-                        previous_InitTime = initTime
+
                     
                     if leadTargFrameCount >= 7:
                         targetY, targetX = target
                         dY = targetY - prevTargetY
                         dX = targetX - prevTargetX
-                        # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
-                        dT = (time.time() - dTprevTack) + 0.9000000001  # loop time from while loop - not correct for this calc
+                        dT = (time.time() - dTprevTack) + 0.9000000001  # track loop time from while loop - not correct for this calc
                         # time.sleep(1)
-                        dTprevTack = time.time()
-
-                        # tNow = dai.Clock.now()
-                        # tDetFrameManipSecs = manip.getTimestamp()
-                        # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
-
-                        # dT = .7    # fixed val, based on analysis
+                        dTprevTack = time.time()    # capture time of all subsequent occurences of a track in a series
 
                         targetSpeedY =  dY / dT
                         targetSpeedX =  dX / dT
@@ -348,8 +340,6 @@ with dai.Device(pipeline) as device:
                         prevTarget = target
 
                         ## for testing
-                        # print("tNow = ", tNow)
-                        # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
                         print("dY = ", dY)
                         print("dX = ", dX)
                         print("dT = ", dT)
@@ -368,72 +358,19 @@ with dai.Device(pipeline) as device:
                         print("target is -> ", target)
 
 
-                ####
-
                     if keyboard.is_pressed(45):
-                    # if True:
-                                            
-                        # if initTargetSpeedCalc:
-                        #     leadTargFrameCount += 1
-
-                        #     if leadTargFrameCount >= 1:
-                        #         prevTargetY, prevTargetX = prevTarget
-                        #         previous_InitTime = initTime
-                            
-                        #     if leadTargFrameCount >= 7:
-                        #         targetY, targetX = target
-                        #         dY = targetY - prevTargetY
-                        #         dX = targetX - prevTargetX
-                        #         # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
-                                
-                        #         # tNow = dai.Clock.now()
-                        #         # tDetFrameManipSecs = manip.getTimestamp()
-                        #         # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
-
-                        #         dT = 5.5    # fixed val, based on analysis
-
-                        #         targetSpeedY =  dY / dT
-                        #         targetSpeedX =  dX / dT
-                        #         # targetLeadY = targetY + (1 * (targetSpeedY * dT))
-                        #         targetLeadY = targetY + dT * dY
-                        #         # targetLeadX = targetX + (1 * (targetSpeedX * dT))
-                        #         targetLeadX = targetX + dT * dX
-
-                        #         ## for testing
-                        #         # print("tNow = ", tNow)
-                        #         # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
-                        #         print("dY = ", dY)
-                        #         print("dX = ", dX)
-                        #         print("dT = ", dT)
-                        #         # print("targetSpeedY = ", targetSpeedY)
-                        #         # print("targetSpeedX = ", targetSpeedX)
-                        #         print("targetLeadY = ", targetLeadY)
-                        #         print("targetLeadX = ", targetLeadX)
-                        #         print("target before lead applied = ", target)
-
-                        #         target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
-
-                        #         ## for testing
-                        #         print("target after lead applied = ", target)
-
-
-                        #         print("target is -> ", target)
-                                
-                                ## move mouse to point at target
-                                AimMouseAlt(target)
-                                
-                                # fire at target 3 times
-                                print(target)
-                                click()
-                                click()
-                                click()
+                        ## move mouse to point at target
+                        AimMouseAlt(target)
+                        
+                        # fire at target 3 times
+                        print(target)
+                        click()
+                        click()
+                        click()
                     
                 
                 ## setup var for next iteration
                 initTargetSpeedCalc = True
-                # leadTargFrameCount = 0  # reset to 0 for next cycle
-                # prevTarget = target
-                ##
 
         if trackedCount == 0:
             ## re-initialize some targeting vars

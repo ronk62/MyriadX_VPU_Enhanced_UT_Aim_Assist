@@ -171,14 +171,14 @@ with dai.Device(pipeline) as device:
     diffs = np.array([])
 
     ## initialize some 'lead the target' vars
-    prevTarget = (0, 0)
+    prevTarget = (450, 800)
     initTargetSpeedCalc = False
     xTargetSpeed = 0
     yTargetSpeed = 0
     leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row ???
 
     while True:
-        previous_time = 0
+        previous_time = time.time()
         initTime, previous_time = deltaT(previous_time)
         # frame = capture_window_PIL()
         frame = capture_window_dxcam()
@@ -284,44 +284,7 @@ with dai.Device(pipeline) as device:
                 #     if bbox_xcenter > 450 and bbox_xcenter < 1150:
                 #         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
 
-                        
-                #         if keyboard.is_pressed(45):
-                #             print(target)
-                #             ## move mouse to point at target
-                #             AimMouseAlt(target)
-                #             # fire at target 3 times
-                #             # print(target)
-                #             click()
-                #             click()
-                #             click()
-                ##
-
-                ## uncomment for full screen targeting
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
-                '''
-                ## for testing
-                print("target before lead = ", target)
-                
-                if initTargetSpeedCalc:
-                    prevTargetY, prevTargetX = prevTarget
-                    targetY, targetX = target
-                    dY = targetY - prevTargetY
-                    dX = targetX - prevTargetX
-                    dT = (initTime - previous_InitTime) + 0.0000000001
-
-                    targetSpeedY =  dY / dT
-                    targetSpeedX =  dX / dT
-                    targetLeadY = targetY + (targetSpeedY * dT)
-                    targetLeadX = targetX + (targetSpeedX * dT)
-
-                    target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
-
-                    ## for testing
-                    print("target after lead = ", target)
-
-                    '''
-
-                ####
 
                 if keyboard.is_pressed(45):
                                         
@@ -336,12 +299,7 @@ with dai.Device(pipeline) as device:
                             targetY, targetX = target
                             dY = targetY - prevTargetY
                             dX = targetX - prevTargetX
-                            # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
                             
-                            # tNow = dai.Clock.now()
-                            # tDetFrameManipSecs = manip.getTimestamp()
-                            # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
-
                             dT = 5.5    # fixed val, based on analysis
 
                             targetSpeedY =  dY / dT
@@ -352,8 +310,6 @@ with dai.Device(pipeline) as device:
                             targetLeadX = targetX + dT * dX
 
                             ## for testing
-                            # print("tNow = ", tNow)
-                            # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
                             print("dY = ", dY)
                             print("dX = ", dX)
                             print("dT = ", dT)
