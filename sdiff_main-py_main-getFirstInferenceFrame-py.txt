@@ -1,0 +1,757 @@
+#!/usr/bin/env python3						#!/usr/bin/env python3
+
+from pathlib import Path					from pathlib import Path
+import cv2							import cv2
+import depthai as dai						import depthai as dai
+import numpy as np						import numpy as np
+import time							import time
+import argparse							import argparse
+# from PIL import ImageGrab, Image				# from PIL import ImageGrab, Image
+from Keyboard_And_Mouse_Controls import *			from Keyboard_And_Mouse_Controls import *
+import dxcam							import dxcam
+
+'''								'''
+Next steps:							Next steps:
+- remove current pid design					- remove current pid design
+- replace with process to get speed and trajectory of target 	- replace with process to get speed and trajectory of target 
+  lead the target						  lead the target
+- perhaps add some addaptive error correction and gains (like	- perhaps add some addaptive error correction and gains (like
+- perhaps attempt the design that uses mouse movement velocit	- perhaps attempt the design that uses mouse movement velocit
+  to gage target lock and fire (Kody's idea)			  to gage target lock and fire (Kody's idea)
+'''								'''
+
+'''								'''
+ref. https://github.com/ra1nty/DXcam				ref. https://github.com/ra1nty/DXcam
+'''								'''
+camera = dxcam.create(device_idx=0, output_idx=1)  # returns 	camera = dxcam.create(device_idx=0, output_idx=1)  # returns 
+
+'''								'''
+5/11/2023 - test 1 - redo (with correct nn settings for yolo)	5/11/2023 - test 1 - redo (with correct nn settings for yolo)
+- all queues set to maxSize=1, blocking=False			- all queues set to maxSize=1, blocking=False
+- also notice --> detectionNetwork.setNumInferenceThreads(2)	- also notice --> detectionNetwork.setNumInferenceThreads(2)
+
+Results:							Results:
+- dtCapFrame: 0.010992050170898438 eFPScapFrame: 90.974831216	- dtCapFrame: 0.010992050170898438 eFPScapFrame: 90.974831216
+- dtNNdetections: 0.012943744659423828 eFPSnnDetections: 77.2	- dtNNdetections: 0.012943744659423828 eFPSnnDetections: 77.2
+- dtTrackletsData: 0.00700068473815918 eFPStrackletsData: 142	- dtTrackletsData: 0.00700068473815918 eFPStrackletsData: 142
+- dtImshow: 0.0030007362365722656 eFPSimshow: 333.25143828397	- dtImshow: 0.0030007362365722656 eFPSimshow: 333.25143828397
+- fullLoopTime: 0.03393721580505371 eFPSfullLoopTime: 29.4661	- fullLoopTime: 0.03393721580505371 eFPSfullLoopTime: 29.4661
+
+
+- UsbSpeed.SUPER						- UsbSpeed.SUPER
+- Latency Det NN: 459.51 ms, Average latency: 459.51 ms, Std:	- Latency Det NN: 459.51 ms, Average latency: 459.51 ms, Std:
+- Latency trackFrame: 531.44 ms, Average latency: 495.47 ms, 	- Latency trackFrame: 531.44 ms, Average latency: 495.47 ms, 
+
+'''								'''
+
+## yolo v3 tiny label texts					## yolo v3 tiny label texts
+labelMap = ["person", "bicycle", "car", "motorbike", "aeropla	labelMap = ["person", "bicycle", "car", "motorbike", "aeropla
+
+nnPathDefault = str((Path(__file__).parent / Path('./models/y	nnPathDefault = str((Path(__file__).parent / Path('./models/y
+parser = argparse.ArgumentParser()				parser = argparse.ArgumentParser()
+parser.add_argument('nnPath', nargs='?', help="Path to detect	parser.add_argument('nnPath', nargs='?', help="Path to detect
+
+args = parser.parse_args()					args = parser.parse_args()
+
+# Create pipeline						# Create pipeline
+pipeline = dai.Pipeline()					pipeline = dai.Pipeline()
+
+# This might improve reducing the latency on some systems	# This might improve reducing the latency on some systems
+pipeline.setXLinkChunkSize(0)					pipeline.setXLinkChunkSize(0)
+
+# Define sources and outputs					# Define sources and outputs
+manip = pipeline.create(dai.node.ImageManip)			manip = pipeline.create(dai.node.ImageManip)
+objectTracker = pipeline.create(dai.node.ObjectTracker)		objectTracker = pipeline.create(dai.node.ObjectTracker)
+detectionNetwork = pipeline.create(dai.node.YoloDetectionNetw	detectionNetwork = pipeline.create(dai.node.YoloDetectionNetw
+
+manipOut = pipeline.create(dai.node.XLinkOut)			manipOut = pipeline.create(dai.node.XLinkOut)
+xinFrame = pipeline.create(dai.node.XLinkIn)			xinFrame = pipeline.create(dai.node.XLinkIn)
+trackerOut = pipeline.create(dai.node.XLinkOut)			trackerOut = pipeline.create(dai.node.XLinkOut)
+xlinkOut = pipeline.create(dai.node.XLinkOut)			xlinkOut = pipeline.create(dai.node.XLinkOut)
+nnOut = pipeline.create(dai.node.XLinkOut)			nnOut = pipeline.create(dai.node.XLinkOut)
+
+manipOut.setStreamName("manip")					manipOut.setStreamName("manip")
+xinFrame.setStreamName("inFrame")				xinFrame.setStreamName("inFrame")
+xlinkOut.setStreamName("trackerFrame")				xlinkOut.setStreamName("trackerFrame")
+trackerOut.setStreamName("tracklets")				trackerOut.setStreamName("tracklets")
+nnOut.setStreamName("nn")					nnOut.setStreamName("nn")
+
+# Properties							# Properties
+xinFrame.setMaxDataSize(1920*1080*3)				xinFrame.setMaxDataSize(1920*1080*3)
+
+manip.initialConfig.setResizeThumbnail(416, 416)    # change 	manip.initialConfig.setResizeThumbnail(416, 416)    # change 
+# The NN model expects BGR input. By default ImageManip outpu	# The NN model expects BGR input. By default ImageManip outpu
+manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)	manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
+manip.inputImage.setBlocking(True)				manip.inputImage.setBlocking(True)
+
+## Network specific settings for yolo-v3-tiny-tf		## Network specific settings for yolo-v3-tiny-tf
+detectionNetwork.setBlobPath(args.nnPath)			detectionNetwork.setBlobPath(args.nnPath)
+detectionNetwork.setConfidenceThreshold(0.75)			detectionNetwork.setConfidenceThreshold(0.75)
+detectionNetwork.input.setBlocking(True)			detectionNetwork.input.setBlocking(True)
+
+detectionNetwork.setNumClasses(80)				detectionNetwork.setNumClasses(80)
+detectionNetwork.setCoordinateSize(4)				detectionNetwork.setCoordinateSize(4)
+detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 	detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 
+detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13	detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13
+detectionNetwork.setIouThreshold(0.5)				detectionNetwork.setIouThreshold(0.5)
+detectionNetwork.setNumInferenceThreads(2)			detectionNetwork.setNumInferenceThreads(2)
+detectionNetwork.input.setBlocking(False)			detectionNetwork.input.setBlocking(False)
+
+objectTracker.inputTrackerFrame.setBlocking(True)		objectTracker.inputTrackerFrame.setBlocking(True)
+objectTracker.inputDetectionFrame.setBlocking(True)		objectTracker.inputDetectionFrame.setBlocking(True)
+objectTracker.inputDetections.setBlocking(True)			objectTracker.inputDetections.setBlocking(True)
+objectTracker.setDetectionLabelsToTrack([0])  # track only pe	objectTracker.setDetectionLabelsToTrack([0])  # track only pe
+# possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TE	# possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TE
+objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_	objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_
+# take the smallest ID when new object is tracked, possible o	# take the smallest ID when new object is tracked, possible o
+objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssig	objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssig
+
+# Linking							# Linking
+manip.out.link(manipOut.input)					manip.out.link(manipOut.input)
+manip.out.link(detectionNetwork.input)				manip.out.link(detectionNetwork.input)
+xinFrame.out.link(manip.inputImage)				xinFrame.out.link(manip.inputImage)
+xinFrame.out.link(objectTracker.inputTrackerFrame)		xinFrame.out.link(objectTracker.inputTrackerFrame)
+detectionNetwork.out.link(nnOut.input)				detectionNetwork.out.link(nnOut.input)
+detectionNetwork.out.link(objectTracker.inputDetections)	detectionNetwork.out.link(objectTracker.inputDetections)
+detectionNetwork.passthrough.link(objectTracker.inputDetectio	detectionNetwork.passthrough.link(objectTracker.inputDetectio
+objectTracker.out.link(trackerOut.input)			objectTracker.out.link(trackerOut.input)
+objectTracker.passthroughTrackerFrame.link(xlinkOut.input)	objectTracker.passthroughTrackerFrame.link(xlinkOut.input)
+
+# Connect and start the pipeline				# Connect and start the pipeline
+with dai.Device(pipeline) as device:				with dai.Device(pipeline) as device:
+
+    print(device.getUsbSpeed())					    print(device.getUsbSpeed())
+
+    qIn = device.getInputQueue(name="inFrame", maxSize=1, blo	    qIn = device.getInputQueue(name="inFrame", maxSize=1, blo
+    trackerFrameQ = device.getOutputQueue(name="trackerFrame"	    trackerFrameQ = device.getOutputQueue(name="trackerFrame"
+    tracklets = device.getOutputQueue(name="tracklets", maxSi	    tracklets = device.getOutputQueue(name="tracklets", maxSi
+    qManip = device.getOutputQueue(name="manip", maxSize=1, b	    qManip = device.getOutputQueue(name="manip", maxSize=1, b
+    qDet = device.getOutputQueue(name="nn", maxSize=1, blocki	    qDet = device.getOutputQueue(name="nn", maxSize=1, blocki
+
+    startTime = time.monotonic()				    startTime = time.monotonic()
+    counter = 0							    counter = 0
+    fps = 0							    fps = 0
+    detections = []						    detections = []
+    frame = None						    frame = None
+
+    def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarra	    def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarra
+        return cv2.resize(arr, shape).transpose(2, 0, 1).flat	        return cv2.resize(arr, shape).transpose(2, 0, 1).flat
+
+    # nn data, being the bounding box locations, are in <0..1	    # nn data, being the bounding box locations, are in <0..1
+    def frameNorm(frame, bbox):					    def frameNorm(frame, bbox):
+        normVals = np.full(len(bbox), frame.shape[0])		        normVals = np.full(len(bbox), frame.shape[0])
+        normVals[::2] = frame.shape[1]				        normVals[::2] = frame.shape[1]
+        return (np.clip(np.array(bbox), 0, 1) * normVals).ast	        return (np.clip(np.array(bbox), 0, 1) * normVals).ast
+
+    def displayFrame(name, frame):				    def displayFrame(name, frame):
+        for detection in detections:				        for detection in detections:
+            bbox = frameNorm(frame, (detection.xmin, detectio	            bbox = frameNorm(frame, (detection.xmin, detectio
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2]	            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2]
+            cv2.putText(frame, labelMap[detection.label], (bb	            cv2.putText(frame, labelMap[detection.label], (bb
+            cv2.putText(frame, f"{int(detection.confidence * 	            cv2.putText(frame, f"{int(detection.confidence * 
+        cv2.imshow(name, frame)					        cv2.imshow(name, frame)
+    								    
+
+    def capture_window_dxcam():					    def capture_window_dxcam():
+        # UT game in 1278 x 686 windowed mode			        # UT game in 1278 x 686 windowed mode
+        image = np.array(camera.grab([0, 0, 1600, 900]))	        image = np.array(camera.grab([0, 0, 1600, 900]))
+        return image						        return image
+    								    
+    								    
+    def deltaT(previous_time):					    def deltaT(previous_time):
+        dt = time.time() - previous_time			        dt = time.time() - previous_time
+        previous_time = time.time()				        previous_time = time.time()
+        return dt, previous_time				        return dt, previous_time
+    								    
+    baseTs = time.monotonic()					    baseTs = time.monotonic()
+    simulatedFps = 30						    simulatedFps = 30
+    # inputFrameShape = (1920, 1080)				    # inputFrameShape = (1920, 1080)
+    inputFrameShape = (1600, 900)				    inputFrameShape = (1600, 900)
+
+    diffs = np.array([])					    diffs = np.array([])
+
+    ## initialize some 'lead the target' vars			    ## initialize some 'lead the target' vars
+    prevTarget = (0, 0)						    prevTarget = (0, 0)
+    initTargetSpeedCalc = False					    initTargetSpeedCalc = False
+    xTargetSpeed = 0						    xTargetSpeed = 0
+    yTargetSpeed = 0						    yTargetSpeed = 0
+    leadTargFrameCount = 0   # only move mouse after 5 tracke	    leadTargFrameCount = 0   # only move mouse after 5 tracke
+							      >	    firstLoopInitT = time.time()
+							      >	    frameCount = 0
+							      >	    firstFrameToTargT = 0
+							      >	    dTfirstFrameToTarget = 0
+
+    while True:							    while True:
+        previous_time = 0					        previous_time = 0
+        initTime, previous_time = deltaT(previous_time)		        initTime, previous_time = deltaT(previous_time)
+        # frame = capture_window_PIL()				        # frame = capture_window_PIL()
+        frame = capture_window_dxcam()				        frame = capture_window_dxcam()
+							      >
+							      >	        ###
+							      >	        frameCount += 1
+							      >	        if frameCount == 1:
+							      >	            firstFrameToTargT = time.time()
+							      >	        ###
+							      >
+        dtCapFrame, previous_time = deltaT(previous_time)	        dtCapFrame, previous_time = deltaT(previous_time)
+        eFPScapFrame = 1 / (dtCapFrame + 0.000000001)		        eFPScapFrame = 1 / (dtCapFrame + 0.000000001)
+
+        if frame.size < 2:  # stop processing this iteration 	        if frame.size < 2:  # stop processing this iteration 
+            continue						            continue
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)		        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        img = dai.ImgFrame()					        img = dai.ImgFrame()
+        img.setType(dai.ImgFrame.Type.BGR888p)			        img.setType(dai.ImgFrame.Type.BGR888p)
+        img.setData(to_planar(frame, inputFrameShape))		        img.setData(to_planar(frame, inputFrameShape))
+        img.setTimestamp(baseTs)				        img.setTimestamp(baseTs)
+        baseTs += 1/simulatedFps				        baseTs += 1/simulatedFps
+
+        img.setWidth(inputFrameShape[0])			        img.setWidth(inputFrameShape[0])
+        img.setHeight(inputFrameShape[1])			        img.setHeight(inputFrameShape[1])
+        qIn.send(img)						        qIn.send(img)
+
+        trackFrame = trackerFrameQ.tryGet()			        trackFrame = trackerFrameQ.tryGet()
+        if trackFrame is None:					        if trackFrame is None:
+            continue						            continue
+
+        track = tracklets.get()					        track = tracklets.get()
+        manip = qManip.get()					        manip = qManip.get()
+        inDet = qDet.get()					        inDet = qDet.get()
+
+        # ###							        # ###
+        # testLatency = inDet.getTimestamp()			        # testLatency = inDet.getTimestamp()
+        # testDaiClockNow = dai.Clock.now()			        # testDaiClockNow = dai.Clock.now()
+        # deltaTlatency = testDaiClockNow - testLatency		        # deltaTlatency = testDaiClockNow - testLatency
+        # print("testLatency = ", testLatency)			        # print("testLatency = ", testLatency)
+        # print("testDaiClockNow = ", testDaiClockNow)		        # print("testDaiClockNow = ", testDaiClockNow)
+        # print("deltaTlatency = ", deltaTlatency)		        # print("deltaTlatency = ", deltaTlatency)
+        # ###							        # ###
+
+        counter+=1						        counter+=1
+        current_time = time.monotonic()				        current_time = time.monotonic()
+        if (current_time - startTime) > 1 :			        if (current_time - startTime) > 1 :
+            fps = counter / (current_time - startTime)		            fps = counter / (current_time - startTime)
+            counter = 0						            counter = 0
+            startTime = current_time				            startTime = current_time
+
+        detections = inDet.detections				        detections = inDet.detections
+        manipFrame = manip.getCvFrame()				        manipFrame = manip.getCvFrame()
+
+        # ###							        # ###
+        # testLatency = inDet.getTimestamp()			        # testLatency = inDet.getTimestamp()
+        # testDaiClockNow = dai.Clock.now()			        # testDaiClockNow = dai.Clock.now()
+        # deltaTlatency = testDaiClockNow - testLatency		        # deltaTlatency = testDaiClockNow - testLatency
+        # print("testLatency = ", testLatency)			        # print("testLatency = ", testLatency)
+        # print("testDaiClockNow = ", testDaiClockNow)		        # print("testDaiClockNow = ", testDaiClockNow)
+        # print("deltaTlatency = ", deltaTlatency)		        # print("deltaTlatency = ", deltaTlatency)
+        # ###							        # ###
+
+        # # Show Latency in miliseconds 			        # # Show Latency in miliseconds 
+        # latencyMs = (dai.Clock.now() - inDet.getTimestamp()	        # latencyMs = (dai.Clock.now() - inDet.getTimestamp()
+        # diffs = np.append(diffs, latencyMs)			        # diffs = np.append(diffs, latencyMs)
+        # print('Latency Det NN: {:.2f} ms, Average latency: 	        # print('Latency Det NN: {:.2f} ms, Average latency: 
+ 								 
+        displayFrame("nn", manipFrame)				        displayFrame("nn", manipFrame)
+        dtNNdetections, previous_time = deltaT(previous_time)	        dtNNdetections, previous_time = deltaT(previous_time)
+        eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)	        eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)
+
+        color = (255, 0, 0)					        color = (255, 0, 0)
+        trackerFrame = trackFrame.getCvFrame()			        trackerFrame = trackFrame.getCvFrame()
+        trackletsData = track.tracklets				        trackletsData = track.tracklets
+
+        trackedCount = 0					        trackedCount = 0
+
+        for t in trackletsData:					        for t in trackletsData:
+            roi = t.roi.denormalize(trackerFrame.shape[1], tr	            roi = t.roi.denormalize(trackerFrame.shape[1], tr
+            x1 = int(roi.topLeft().x)				            x1 = int(roi.topLeft().x)
+            y1 = int(roi.topLeft().y)				            y1 = int(roi.topLeft().y)
+            x2 = int(roi.bottomRight().x)			            x2 = int(roi.bottomRight().x)
+            y2 = int(roi.bottomRight().y)			            y2 = int(roi.bottomRight().y)
+
+            try:						            try:
+                label = labelMap[t.label]			                label = labelMap[t.label]
+            except:						            except:
+                label = t.label					                label = t.label
+
+            tStatusName = t.status.name				            tStatusName = t.status.name
+
+            if tStatusName == 'TRACKED':			            if tStatusName == 'TRACKED':
+                trackedCount += 1				                trackedCount += 1
+
+                cv2.putText(trackerFrame, str(label), (x1 + 1	                cv2.putText(trackerFrame, str(label), (x1 + 1
+                cv2.putText(trackerFrame, f"ID: {[t.id]}", (x	                cv2.putText(trackerFrame, f"ID: {[t.id]}", (x
+                cv2.putText(trackerFrame, t.status.name, (x1 	                cv2.putText(trackerFrame, t.status.name, (x1 
+                cv2.rectangle(trackerFrame, (x1, y1), (x2, y2	                cv2.rectangle(trackerFrame, (x1, y1), (x2, y2
+
+                bbox_height = (y2 - y1)				                bbox_height = (y2 - y1)
+                bbox_ycenter = y1 + bbox_height/2		                bbox_ycenter = y1 + bbox_height/2
+                						                
+                bbox_width = (x2 - x1)				                bbox_width = (x2 - x1)
+                bbox_xcenter = x1 + bbox_width/2		                bbox_xcenter = x1 + bbox_width/2
+
+                ## uncomment for ROI targeting use		                ## uncomment for ROI targeting use
+                # if bbox_ycenter > 200 and bbox_ycenter < 70	                # if bbox_ycenter > 200 and bbox_ycenter < 70
+                #     if bbox_xcenter > 450 and bbox_xcenter 	                #     if bbox_xcenter > 450 and bbox_xcenter 
+                #         target = (int(y1 + 0.25 * bbox_heig	                #         target = (int(y1 + 0.25 * bbox_heig
+
+                        					                        
+                #         if keyboard.is_pressed(45):		                #         if keyboard.is_pressed(45):
+                #             print(target)			                #             print(target)
+                #             ## move mouse to point at targe	                #             ## move mouse to point at targe
+                #             AimMouseAlt(target)		                #             AimMouseAlt(target)
+                #             # fire at target 3 times		                #             # fire at target 3 times
+                #             # print(target)			                #             # print(target)
+                #             click()				                #             click()
+                #             click()				                #             click()
+                #             click()				                #             click()
+                ##						                ##
+
+							      >	                dTfirstFrameToTarget = time.time() - firstFra
+							      >	                dTfirstLoopInit = time.time() - firstLoopInit
+							      >
+                ## uncomment for full screen targeting		                ## uncomment for full screen targeting
+                target = (int(y1 + 0.25 * bbox_height), int(b	                target = (int(y1 + 0.25 * bbox_height), int(b
+                '''					      |
+                ## for testing					                ## for testing
+                print("target before lead = ", target)	      <
+                					      <
+                if initTargetSpeedCalc:				                if initTargetSpeedCalc:
+                    prevTargetY, prevTargetX = prevTarget     |	                    leadTargFrameCount += 1
+                    targetY, targetX = target		      |	                    if leadTargFrameCount == 1:
+                    dY = targetY - prevTargetY		      |	                        dTprevTack = time.time()
+                    dX = targetX - prevTargetX		      |
+                    dT = (initTime - previous_InitTime) + 0.0 |	                    if leadTargFrameCount > 1:
+							      |	                        prevTargetY, prevTargetX = prevTarget
+                    targetSpeedY =  dY / dT		      |	                        previous_InitTime = initTime
+                    targetSpeedX =  dX / dT		      |	                    
+                    targetLeadY = targetY + (targetSpeedY * d |	                    if leadTargFrameCount >= 7:
+                    targetLeadX = targetX + (targetSpeedX * d |	                        targetY, targetX = target
+							      >	                        dY = targetY - prevTargetY
+							      >	                        dX = targetX - prevTargetX
+							      >	                        # dT = (initTime - previous_InitTime)
+							      >	                        dT = (time.time() - dTprevTack) + 0.9
+							      >	                        # time.sleep(1)
+							      >	                        dTprevTack = time.time()
+							      >
+							      >	                        # tNow = dai.Clock.now()
+							      >	                        # tDetFrameManipSecs = manip.getTimes
+							      >	                        # dT = (dai.Clock.now() - manipFrame.
+							      >
+							      >	                        # dT = .7    # fixed val, based on an
+							      >
+							      >	                        targetSpeedY =  dY / dT
+							      >	                        targetSpeedX =  dX / dT
+							      >	                        # targetLeadY = targetY + (1 * (targe
+							      >	                        targetLeadY = targetY + dT * dY
+							      >	                        # targetLeadX = targetX + (1 * (targe
+							      >	                        targetLeadX = targetX + dT * dX
+							      >
+							      >	                        prevTarget = target
+							      >
+							      >	                        ## for testing
+							      >	                        # print("tNow = ", tNow)
+							      >	                        # print("tDetFrameManipSecs = ", tDet
+							      >	                        print("dY = ", dY)
+							      >	                        print("dX = ", dX)
+							      >	                        print("dT = ", dT)
+							      >	                        print("targetSpeedY = ", targetSpeedY
+							      >	                        print("targetSpeedX = ", targetSpeedX
+							      >	                        print("targetLeadY = ", targetLeadY)
+							      >	                        print("targetLeadX = ", targetLeadX)
+							      >	                        print("target before lead applied = "
+
+                    target = (targetLeadY, targetLeadX)       |	                        target = (targetLeadY, targetLeadX)  
+
+                    ## for testing			      |	                        ## for testing
+                    print("target after lead = ", target)     |	                        print("target after lead applied = ",
+
+                    '''					      <
+
+                ####					      |	                        print("target is -> ", target)
+
+                if keyboard.is_pressed(45):		      <
+                                        		      <
+                    if initTargetSpeedCalc:		      <
+                        leadTargFrameCount += 1		      <
+							      <
+                        if leadTargFrameCount >= 1:	      <
+                            prevTargetY, prevTargetX = prevTa <
+                            previous_InitTime = initTime      <
+                        				      <
+                        if leadTargFrameCount >= 7:	      <
+                            targetY, targetX = target	      <
+                            dY = targetY - prevTargetY	      <
+                            dX = targetX - prevTargetX	      <
+                            # dT = (initTime - previous_InitT <
+                            				      <
+                            # tNow = dai.Clock.now()	      <
+                            # tDetFrameManipSecs = manip.getT <
+                            # dT = (dai.Clock.now() - manipFr <
+							      <
+                            dT = 5.5    # fixed val, based on <
+							      <
+                            targetSpeedY =  dY / dT	      <
+                            targetSpeedX =  dX / dT	      <
+                            # targetLeadY = targetY + (1 * (t <
+                            targetLeadY = targetY + dT * dY   <
+                            # targetLeadX = targetX + (1 * (t <
+                            targetLeadX = targetX + dT * dX   <
+							      <
+                            ## for testing		      <
+                            # print("tNow = ", tNow)	      <
+                            # print("tDetFrameManipSecs = ",  <
+                            print("dY = ", dY)		      <
+                            print("dX = ", dX)		      <
+                            print("dT = ", dT)		      <
+                            # print("targetSpeedY = ", target <
+                            # print("targetSpeedX = ", target <
+                            print("targetLeadY = ", targetLea <
+                            print("targetLeadX = ", targetLea <
+                            print("target before lead applied <
+							      <
+                            target = (targetLeadY, targetLead <
+							      <
+                            ## for testing		      <
+                            print("target after lead applied  <
+
+							      >	                ####
+
+                            print("target is -> ", target)    |	                    if keyboard.is_pressed(45):
+							      >	                    # if True:
+							      >	                                            
+							      >	                        # if initTargetSpeedCalc:
+							      >	                        #     leadTargFrameCount += 1
+							      >
+							      >	                        #     if leadTargFrameCount >= 1:
+							      >	                        #         prevTargetY, prevTargetX = 
+							      >	                        #         previous_InitTime = initTim
+                            					                            
+                            ## move mouse to point at target  |	                        #     if leadTargFrameCount >= 7:
+                            AimMouseAlt(target)		      |	                        #         targetY, targetX = target
+                            				      |	                        #         dY = targetY - prevTargetY
+                            # fire at target 3 times	      |	                        #         dX = targetX - prevTargetX
+                            # print(target)		      |	                        #         # dT = (initTime - previous
+                            click()			      |	                                
+                            click()			      |	                        #         # tNow = dai.Clock.now()
+                            click()			      |	                        #         # tDetFrameManipSecs = mani
+							      |	                        #         # dT = (dai.Clock.now() - m
+                            leadTargFrameCount = 0  # reset t |
+							      >	                        #         dT = 5.5    # fixed val, ba
+							      >
+							      >	                        #         targetSpeedY =  dY / dT
+							      >	                        #         targetSpeedX =  dX / dT
+							      >	                        #         # targetLeadY = targetY + (
+							      >	                        #         targetLeadY = targetY + dT 
+							      >	                        #         # targetLeadX = targetX + (
+							      >	                        #         targetLeadX = targetX + dT 
+							      >
+							      >	                        #         ## for testing
+							      >	                        #         # print("tNow = ", tNow)
+							      >	                        #         # print("tDetFrameManipSecs
+							      >	                        #         print("dY = ", dY)
+							      >	                        #         print("dX = ", dX)
+							      >	                        #         print("dT = ", dT)
+							      >	                        #         # print("targetSpeedY = ", 
+							      >	                        #         # print("targetSpeedX = ", 
+							      >	                        #         print("targetLeadY = ", tar
+							      >	                        #         print("targetLeadX = ", tar
+							      >	                        #         print("target before lead a
+							      >
+							      >	                        #         target = (targetLeadY, targ
+							      >
+							      >	                        #         ## for testing
+							      >	                        #         print("target after lead ap
+							      >
+							      >
+							      >	                        #         print("target is -> ", targ
+							      >	                                
+							      >	                                ## move mouse to point at tar
+							      >	                                AimMouseAlt(target)
+							      >	                                
+							      >	                                # fire at target 3 times
+							      >	                                print(target)
+							      >	                                click()
+							      >	                                click()
+							      >	                                click()
+                    						                    
+                						                
+                ## setup var for next iteration			                ## setup var for next iteration
+                initTargetSpeedCalc = True			                initTargetSpeedCalc = True
+                prevTarget = target			      |	                # leadTargFrameCount = 0  # reset to 0 for ne
+							      >	                # prevTarget = target
+                ##						                ##
+
+        if trackedCount == 0:					        if trackedCount == 0:
+            ## re-initialize some targeting vars		            ## re-initialize some targeting vars
+            initTargetSpeedCalc = False				            initTargetSpeedCalc = False
+            xTargetSpeed = 0					            xTargetSpeed = 0
+            yTargetSpeed = 0					            yTargetSpeed = 0
+            leadTargFrameCount = 0				            leadTargFrameCount = 0
+
+        cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), 	        cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), 
+
+        dtTrackletsData, previous_time = deltaT(previous_time	        dtTrackletsData, previous_time = deltaT(previous_time
+        eFPStrackletsData = 1 / (dtTrackletsData + 0.00000000	        eFPStrackletsData = 1 / (dtTrackletsData + 0.00000000
+
+        ## Show Latency in miliseconds 			      |	        # Show Latency in miliseconds 
+        # latencyMs = (dai.Clock.now() - trackFrame.getTimest |	        latencyMs = (dai.Clock.now() - trackFrame.getTimestam
+        # diffs = np.append(diffs, latencyMs)		      |	        diffs = np.append(diffs, latencyMs)
+        # print('Latency trackFrame: {:.2f} ms, Average laten |	        print('Latency trackFrame: {:.2f} ms, Average latency
+
+        ## use with dxcam version				        ## use with dxcam version
+        if frame.size > 1:					        if frame.size > 1:
+            cv2.imshow("tracker", trackerFrame)			            cv2.imshow("tracker", trackerFrame)
+
+            if cv2.waitKey(1) == ord('q'):			            if cv2.waitKey(1) == ord('q'):
+                break						                break
+
+        dtImshow, previous_time = deltaT(previous_time)		        dtImshow, previous_time = deltaT(previous_time)
+        eFPSimshow = 1 / (dtImshow + 0.000000001)		        eFPSimshow = 1 / (dtImshow + 0.000000001)
+
+        							        
+        fullLoopTime = time.time() - initTime			        fullLoopTime = time.time() - initTime
+        eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)	        eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
+
+
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", e	        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", e
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDet	        # print("dtNNdetections:", dtNNdetections, "eFPSnnDet
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStra	        # print("dtTrackletsData:", dtTrackletsData, "eFPStra
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSims	        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSims
+        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopT	        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopT178a179,182
+
+
+
+
+--------
+
+
+
+
+>     firstLoopInitT = time.time()
+>     frameCount = 0
+>     firstFrameToTargT = 0
+>     dTfirstFrameToTarget = 0
+184a189,195
+> 
+>         ###
+>         frameCount += 1
+>         if frameCount == 1:
+>             firstFrameToTargT = time.time()
+>         ###
+> 
+298a310,312
+>                 dTfirstFrameToTarget = time.time() - firstFrameToTargT
+>                 dTfirstLoopInit = time.time() - firstLoopInitT
+> 
+301c315
+<                 '''
+---
+> 
+303,304d316
+<                 print("target before lead = ", target)
+<                 
+306,315c318,360
+<                     prevTargetY, prevTargetX = prevTarget
+<                     targetY, targetX = target
+<                     dY = targetY - prevTargetY
+<                     dX = targetX - prevTargetX
+<                     dT = (initTime - previous_InitTime) + 0.0000000001
+< 
+<                     targetSpeedY =  dY / dT
+<                     targetSpeedX =  dX / dT
+<                     targetLeadY = targetY + (targetSpeedY * dT)
+<                     targetLeadX = targetX + (targetSpeedX * dT)
+---
+>                     leadTargFrameCount += 1
+>                     if leadTargFrameCount == 1:
+>                         dTprevTack = time.time()
+> 
+>                     if leadTargFrameCount > 1:
+>                         prevTargetY, prevTargetX = prevTarget
+>                         previous_InitTime = initTime
+>                     
+>                     if leadTargFrameCount >= 7:
+>                         targetY, targetX = target
+>                         dY = targetY - prevTargetY
+>                         dX = targetX - prevTargetX
+>                         # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
+>                         dT = (time.time() - dTprevTack) + 0.9000000001  # loop time from while loop - not correct for this calc
+>                         # time.sleep(1)
+>                         dTprevTack = time.time()
+> 
+>                         # tNow = dai.Clock.now()
+>                         # tDetFrameManipSecs = manip.getTimestamp()
+>                         # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
+> 
+>                         # dT = .7    # fixed val, based on analysis
+> 
+>                         targetSpeedY =  dY / dT
+>                         targetSpeedX =  dX / dT
+>                         # targetLeadY = targetY + (1 * (targetSpeedY * dT))
+>                         targetLeadY = targetY + dT * dY
+>                         # targetLeadX = targetX + (1 * (targetSpeedX * dT))
+>                         targetLeadX = targetX + dT * dX
+> 
+>                         prevTarget = target
+> 
+>                         ## for testing
+>                         # print("tNow = ", tNow)
+>                         # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
+>                         print("dY = ", dY)
+>                         print("dX = ", dX)
+>                         print("dT = ", dT)
+>                         print("targetSpeedY = ", targetSpeedY)
+>                         print("targetSpeedX = ", targetSpeedX)
+>                         print("targetLeadY = ", targetLeadY)
+>                         print("targetLeadX = ", targetLeadX)
+>                         print("target before lead applied = ", target)
+317c362
+<                     target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+---
+>                         target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+319,320c364,365
+<                     ## for testing
+<                     print("target after lead = ", target)
+---
+>                         ## for testing
+>                         print("target after lead applied = ", target)
+322d366
+<                     '''
+324c368
+<                 ####
+---
+>                         print("target is -> ", target)
+326,369d369
+<                 if keyboard.is_pressed(45):
+<                                         
+<                     if initTargetSpeedCalc:
+<                         leadTargFrameCount += 1
+< 
+<                         if leadTargFrameCount >= 1:
+<                             prevTargetY, prevTargetX = prevTarget
+<                             previous_InitTime = initTime
+<                         
+<                         if leadTargFrameCount >= 7:
+<                             targetY, targetX = target
+<                             dY = targetY - prevTargetY
+<                             dX = targetX - prevTargetX
+<                             # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
+<                             
+<                             # tNow = dai.Clock.now()
+<                             # tDetFrameManipSecs = manip.getTimestamp()
+<                             # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
+< 
+<                             dT = 5.5    # fixed val, based on analysis
+< 
+<                             targetSpeedY =  dY / dT
+<                             targetSpeedX =  dX / dT
+<                             # targetLeadY = targetY + (1 * (targetSpeedY * dT))
+<                             targetLeadY = targetY + dT * dY
+<                             # targetLeadX = targetX + (1 * (targetSpeedX * dT))
+<                             targetLeadX = targetX + dT * dX
+< 
+<                             ## for testing
+<                             # print("tNow = ", tNow)
+<                             # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
+<                             print("dY = ", dY)
+<                             print("dX = ", dX)
+<                             print("dT = ", dT)
+<                             # print("targetSpeedY = ", targetSpeedY)
+<                             # print("targetSpeedX = ", targetSpeedX)
+<                             print("targetLeadY = ", targetLeadY)
+<                             print("targetLeadX = ", targetLeadX)
+<                             print("target before lead applied = ", target)
+< 
+<                             target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+< 
+<                             ## for testing
+<                             print("target after lead applied = ", target)
+370a371
+>                 ####
+372c373,381
+<                             print("target is -> ", target)
+---
+>                     if keyboard.is_pressed(45):
+>                     # if True:
+>                                             
+>                         # if initTargetSpeedCalc:
+>                         #     leadTargFrameCount += 1
+> 
+>                         #     if leadTargFrameCount >= 1:
+>                         #         prevTargetY, prevTargetX = prevTarget
+>                         #         previous_InitTime = initTime
+374,383c383,429
+<                             ## move mouse to point at target
+<                             AimMouseAlt(target)
+<                             
+<                             # fire at target 3 times
+<                             # print(target)
+<                             click()
+<                             click()
+<                             click()
+< 
+<                             leadTargFrameCount = 0  # reset to 0 for next cycle
+---
+>                         #     if leadTargFrameCount >= 7:
+>                         #         targetY, targetX = target
+>                         #         dY = targetY - prevTargetY
+>                         #         dX = targetX - prevTargetX
+>                         #         # dT = (initTime - previous_InitTime) + 0.0000000001  # loop time from while loop - not correct for this calc
+>                                 
+>                         #         # tNow = dai.Clock.now()
+>                         #         # tDetFrameManipSecs = manip.getTimestamp()
+>                         #         # dT = (dai.Clock.now() - manipFrame.getTimestamp()).total_seconds()   # dT in seconds from detection image timestamp
+> 
+>                         #         dT = 5.5    # fixed val, based on analysis
+> 
+>                         #         targetSpeedY =  dY / dT
+>                         #         targetSpeedX =  dX / dT
+>                         #         # targetLeadY = targetY + (1 * (targetSpeedY * dT))
+>                         #         targetLeadY = targetY + dT * dY
+>                         #         # targetLeadX = targetX + (1 * (targetSpeedX * dT))
+>                         #         targetLeadX = targetX + dT * dX
+> 
+>                         #         ## for testing
+>                         #         # print("tNow = ", tNow)
+>                         #         # print("tDetFrameManipSecs = ", tDetFrameManipSecs)
+>                         #         print("dY = ", dY)
+>                         #         print("dX = ", dX)
+>                         #         print("dT = ", dT)
+>                         #         # print("targetSpeedY = ", targetSpeedY)
+>                         #         # print("targetSpeedX = ", targetSpeedX)
+>                         #         print("targetLeadY = ", targetLeadY)
+>                         #         print("targetLeadX = ", targetLeadX)
+>                         #         print("target before lead applied = ", target)
+> 
+>                         #         target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
+> 
+>                         #         ## for testing
+>                         #         print("target after lead applied = ", target)
+> 
+> 
+>                         #         print("target is -> ", target)
+>                                 
+>                                 ## move mouse to point at target
+>                                 AimMouseAlt(target)
+>                                 
+>                                 # fire at target 3 times
+>                                 print(target)
+>                                 click()
+>                                 click()
+>                                 click()
+388c434,435
+<                 prevTarget = target
+---
+>                 # leadTargFrameCount = 0  # reset to 0 for next cycle
+>                 # prevTarget = target
+403,406c450,453
+<         ## Show Latency in miliseconds 
+<         # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+<         # diffs = np.append(diffs, latencyMs)
+<         # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+---
+>         # Show Latency in miliseconds 
+>         latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+>         diffs = np.append(diffs, latencyMs)
+>         print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
