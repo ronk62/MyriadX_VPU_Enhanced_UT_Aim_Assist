@@ -119,11 +119,19 @@ with dai.Device(pipeline) as device:
 
     print(device.getUsbSpeed())
 
-    qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
-    trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
-    tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
-    qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
-    qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
+    ### blocking=False
+    # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
+    # trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
+    # tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
+    # qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
+    # qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
+
+    ### blocking=True
+    qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
+    trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=True)
+    tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=True)
+    qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=True)
+    qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=True)
 
     startTime = time.monotonic()
     counter = 0
@@ -180,7 +188,8 @@ with dai.Device(pipeline) as device:
 
     while True:
         previous_time = time.time()
-        initTime, previous_time = deltaT(previous_time)
+        _, previous_time = deltaT(previous_time)
+        initTime = previous_time
         # frame = capture_window_PIL()
         frame = capture_window_dxcam()
 
@@ -323,7 +332,8 @@ with dai.Device(pipeline) as device:
                         targetY, targetX = target
                         dY = targetY - prevTargetY
                         dX = targetX - prevTargetX
-                        dT = (time.time() - dTprevTack) + 0.9000000001  # track loop time from while loop - not correct for this calc
+                        # dT = (time.time() - dTprevTack) + 0.9000000001  # track loop time from while loop - not correct for this calc
+                        dT = (time.time() - dTprevTack) + 0.0000000001  # track loop time from while loop - not correct for this calc
                         # time.sleep(1)
                         dTprevTack = time.time()    # capture time of all subsequent occurences of a track in a series
 
@@ -354,6 +364,16 @@ with dai.Device(pipeline) as device:
 
                         print("target is -> ", target)
 
+                        if leadTargFrameCount == 30:
+                            print(leadTargFrameCount)
+                        else:
+                            print(leadTargFrameCount)
+
+                        # # Show Latency in miliseconds 
+                        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+                        # diffs = np.append(diffs, latencyMs)
+                        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+
 
                     if keyboard.is_pressed(45):
                         ## move mouse to point at target
@@ -381,10 +401,10 @@ with dai.Device(pipeline) as device:
         dtTrackletsData, previous_time = deltaT(previous_time)
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
-        # Show Latency in miliseconds 
-        latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        diffs = np.append(diffs, latencyMs)
-        print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
+        # # Show Latency in miliseconds 
+        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
+        # diffs = np.append(diffs, latencyMs)
+        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
         ## use with dxcam version
         if frame.size > 1:
@@ -401,8 +421,8 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
