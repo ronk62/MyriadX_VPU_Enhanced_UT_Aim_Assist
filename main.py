@@ -184,6 +184,11 @@ with dai.Device(pipeline) as device:
 
 
     while True:
+        if keyboard.is_pressed(46):     # press and hold 'c' to exit
+            print("exiting...")
+            print("...now")
+            exit()
+    
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
         initTime = previous_time
@@ -251,7 +256,7 @@ with dai.Device(pipeline) as device:
 
             if tStatusName == 'TRACKED':
                 trackedCount += 1
-                trackedTargFrameCount += 1
+                # trackedTargFrameCount += 1
 
                 cv2.putText(trackerFrame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
@@ -276,12 +281,12 @@ with dai.Device(pipeline) as device:
 
                 targetY, targetX = target
 
-                ###  folley?
-                # gameScrnWidth = 1600
-                # gameScrnHeight = 900
+                ###  
+                gameScrnWidth = 1600
+                gameScrnHeight = 900
                 
-                # errorY = targetY - (gameScrnHeight / 2)
-                # errorX = targetX - (gameScrnWidth / 2)
+                errorY = targetY - (gameScrnHeight / 2)
+                errorX = targetX - (gameScrnWidth / 2)
                 
 
                 '''
@@ -296,49 +301,47 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
-                KpY = 0.9
-                KiY = 0.01
-                KdY = 0.01
+                KpY = 0.8  # 0.75, 0.85, 0.9, 0.85, 1
+                KiY = 0.18  # 0.09, 0.07,  0.05
+                KdY = 0.03  # 0.02, 0.009, 0, 0, 1
 
-                KpX = 0.9
-                KiX = 0.01
-                KdX = 0.01
+                KpX = 0.8  # 0.75, 0.85, 0.9, 0.85, 1
+                KiX = 0.18  # 0.09, 0.07, 0.05
+                KdX = 0.03  # 0.02, 0.009, 0, 0, 1
 
-                if targetY < 450:
-                    KiY = -1 * KiY
-                    KdY = -1 * KdY
-                if targetX < 800:
-                    KiX = -1 * KiX
-                    KdX = -1 * KdX
+                ScaleY = 0.05
+                ScaleX = 0.05
+
                 
+                if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
+                    trackedTargFrameCount += 1
 
-                if trackedTargFrameCount == 1:
-                    pidTargetY = pidY.computePidOut(KpY, KiY, KdY, targetY, True)
-                    pidTargetX = pidX.computePidOut(KpX, KiX, KdX, targetX, True)
-                else:
-                    pidTargetY = pidY.computePidOut(KpY, KiY, KdY, targetY, False)
-                    pidTargetX = pidX.computePidOut(KpX, KiX, KdX, targetX, False)
+                    if trackedTargFrameCount == 1:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, True)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, True)
+                    else:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, False)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, False)
+                    
+                    target = (pidTargetY, pidTargetX)
+                    print("target after pids applied = ", target)
+                    
+                    mouseMotionY = ScaleY * pidTargetY
+                    mouseMotionX = ScaleX * pidTargetX
 
-                target = (int(pidTargetY), int(pidTargetX))
-
-                ## for testing
-                print("target after pids applied = ", target)
-
-
-                print("target is -> ", target)
-
-
-                if keyboard.is_pressed(45):
-                # if True:
                     ## move mouse to point at target
-                    AimMouseAlt(target)
+                    # AimMouseAlt(target)
+                    # Move pointer relative to current position
+                    mouse.move(mouseMotionX, mouseMotionY)
+                    print("scaled mouseMotionX, mouseMotionY ", mouseMotionX, mouseMotionY)
                     
                     # fire at target 3 times
-                    print(target)
                     click()
                     click()
                     click()
-                    
+                
+                else:
+                    trackedTargFrameCount = 0
 
         if trackedCount == 0:
             trackedTargFrameCount = 0
@@ -363,8 +366,8 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
