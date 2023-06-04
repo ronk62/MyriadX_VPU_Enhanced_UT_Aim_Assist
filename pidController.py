@@ -1,7 +1,5 @@
 # no she-bang in Windows
 
-import time
-
 
 '''
 pidClass psuedo-code
