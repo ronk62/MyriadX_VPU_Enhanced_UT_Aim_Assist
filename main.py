@@ -8,13 +8,14 @@ import time
 import argparse
 from Keyboard_And_Mouse_Controls import *
 from pidController import *
+import matplotlib.pyplot as plt
 import dxcam
 
 '''
 Next steps:
 - introduce process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
-- perhaps add some addaptive error correction and gains (like a pid controller would)
+- Done --> perhaps add some addaptive error correction and gains (pid controller)
 '''
 
 '''
@@ -143,6 +144,21 @@ with dai.Device(pipeline) as device:
     detections = []
     frame = None
 
+    
+    # init np arrays
+    timestampArray = np.array([], dtype=np.float32)       # array to hold timestamps
+
+    targetYarray = np.array([], dtype=np.float32)         # array to hold raw screen targetY
+    errorYarray = np.array([], dtype=np.float32)          # array to hold screen offset errorY
+    pidTargetYarray = np.array([], dtype=np.float32)      # array to hold pidTargetY
+    mouseMotionYarray = np.array([], dtype=np.float32)    # array to hold mouseMotionY
+
+    targetXarray = np.array([], dtype=np.float32)         # array to hold raw screen targetX
+    errorXarray = np.array([], dtype=np.float32)          # array to hold screen offset errorX
+    pidTargetXarray = np.array([], dtype=np.float32)      # array to hold pidTargetX
+    mouseMotionXarray = np.array([], dtype=np.float32)    # array to hold mouseMotionX
+
+
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
         return cv2.resize(arr, shape).transpose(2, 0, 1).flatten()
 
@@ -171,7 +187,8 @@ with dai.Device(pipeline) as device:
         dt = time.time() - previous_time
         previous_time = time.time()
         return dt, previous_time
-    
+        
+
     baseTs = time.monotonic()
     simulatedFps = 30
     # inputFrameShape = (1920, 1080)
@@ -185,9 +202,8 @@ with dai.Device(pipeline) as device:
 
     while True:
         if keyboard.is_pressed(46):     # press and hold 'c' to exit
-            print("exiting...")
-            print("...now")
-            exit()
+            print("breaking loop; plotting data...")
+            break
     
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
@@ -323,17 +339,33 @@ with dai.Device(pipeline) as device:
                         pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, False)
                         pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, False)
                     
+
+                    ## Update arrays
+                    currentTime = time.time()
+                    timestampArray = np.append(timestampArray, currentTime)
+                    targetYarray = np.append(targetYarray, targetY)
+                    targetXarray = np.append(targetXarray, targetX)
+                    errorYarray = np.append(errorYarray, errorY)
+                    errorXarray = np.append(errorXarray, errorX)
+                    pidTargetYarray = np.append(pidTargetYarray, pidTargetY)
+                    pidTargetXarray = np.append(pidTargetXarray, pidTargetX)
+                    
                     target = (pidTargetY, pidTargetX)
                     print("target after pids applied = ", target)
                     
                     mouseMotionY = ScaleY * pidTargetY
                     mouseMotionX = ScaleX * pidTargetX
 
+                    ## Update arrays
+                    mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
+                    mouseMotionXarray = np.append(mouseMotionXarray, mouseMotionX)
+
+
                     ## move mouse to point at target
                     # AimMouseAlt(target)
                     # Move pointer relative to current position
                     mouse.move(mouseMotionX, mouseMotionY)
-                    print("scaled mouseMotionX, mouseMotionY ", mouseMotionX, mouseMotionY)
+                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
                     
                     # fire at target 3 times
                     click()
@@ -371,3 +403,49 @@ with dai.Device(pipeline) as device:
         # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
         # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
         # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+    
+
+    ### plot the data, then exit
+    # convert values in timestampArray to dT
+    print("converting values in timestampArray to dT...")
+    for i in range(len(timestampArray)):
+        timestampArray[i] = timestampArray[i] - timestampArray[0]
+
+    ## Create plots
+    # raw-target and error values
+    plt.figure(1)
+    plt.plot(timestampArray,targetYarray, label='targetYarray')
+    plt.plot(timestampArray,targetXarray, label='targetXarray')
+    plt.plot(timestampArray,errorYarray, label='errorYarray')
+    plt.plot(timestampArray,errorXarray, label='errorXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('raw-target and error values')
+    plt.title('target and error values over time')
+    plt.legend()
+    # plt.show()
+
+    # pid-target values
+    plt.figure(2)
+    plt.plot(timestampArray,pidTargetYarray, label='pidTargetYarray')
+    plt.plot(timestampArray,pidTargetXarray, label='pidTargetXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('pid-target values')
+    plt.title('pid-target values over time')
+    plt.legend()
+    # plt.show()
+
+    # mouseMotion values
+    plt.figure(3)
+    plt.plot(timestampArray,mouseMotionYarray, label='mouseMotionYarray')
+    plt.plot(timestampArray,mouseMotionXarray, label='mouseMotionXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('mouseMotion values')
+    plt.title('mouseMotion values over time')
+    plt.legend()
+    plt.show()
+
+    print("exiting...")
+    exit()
