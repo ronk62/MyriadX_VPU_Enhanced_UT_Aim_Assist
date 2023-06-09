@@ -251,7 +251,10 @@ with dai.Device(pipeline) as device:
         eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)
 
         color = (255, 0, 0)
-        trackerFrame = trackFrame.getCvFrame()
+        # trackerFrame = trackFrame.getCvFrame()      # orig/actual trackerFrame
+        trackerFrame = capture_window_dxcam()       # game frame reCapture
+        if not np.any(trackerFrame):
+            continue
         trackletsData = track.tracklets
 
         trackedCount = 0
@@ -317,13 +320,13 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
-                KpY = 0.8  # 0.75, 0.85, 0.9, 0.85, 1
-                KiY = 0.18  # 0.09, 0.07,  0.05
-                KdY = 0.03  # 0.02, 0.009, 0, 0, 1
+                KpY = 1  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiY = 0  # 0.18, 0.09, 0.07,  0.05
+                KdY = 0  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                KpX = 0.8  # 0.75, 0.85, 0.9, 0.85, 1
-                KiX = 0.18  # 0.09, 0.07, 0.05
-                KdX = 0.03  # 0.02, 0.009, 0, 0, 1
+                KpX = 1  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiX = 0  # 0.18, 0.09, 0.07, 0.05
+                KdX = 0  # 0.03, 0.02, 0.009, 0, 0, 1
 
                 ScaleY = 0.05
                 ScaleX = 0.05
@@ -371,6 +374,8 @@ with dai.Device(pipeline) as device:
                     click()
                     click()
                     click()
+
+                    # previousTrackTime = time.time()     # use to calculate dT between track frames
                 
                 else:
                     trackedTargFrameCount = 0
@@ -406,10 +411,10 @@ with dai.Device(pipeline) as device:
     
 
     ### plot the data, then exit
-    # convert values in timestampArray to dT
-    print("converting values in timestampArray to dT...")
-    for i in range(len(timestampArray)):
-        timestampArray[i] = timestampArray[i] - timestampArray[0]
+    # # convert values in timestampArray to dT
+    # print("converting values in timestampArray to dT...")
+    # for i in range(len(timestampArray)):
+    #     timestampArray[i] = timestampArray[i] - timestampArray[0]
 
     ## Create plots
     # raw-target and error values
