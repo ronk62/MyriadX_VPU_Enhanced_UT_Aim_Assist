@@ -105,6 +105,7 @@ objectTracker.inputDetections.setBlocking(True)
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # testing an alternative to 'ZERO_TERM_COLOR_HISTOGRAM'
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
