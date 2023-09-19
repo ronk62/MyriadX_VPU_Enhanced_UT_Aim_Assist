@@ -252,8 +252,8 @@ with dai.Device(pipeline) as device:
         eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)
 
         color = (255, 0, 0)
-        # trackerFrame = trackFrame.getCvFrame()      # orig/actual trackerFrame
-        trackerFrame = capture_window_dxcam()       # game frame reCapture
+        trackerFrame = trackFrame.getCvFrame()      # orig/actual trackerFrame
+        # trackerFrame = capture_window_dxcam()       # game frame reCapture
         if not np.any(trackerFrame):
             continue
         trackletsData = track.tracklets
