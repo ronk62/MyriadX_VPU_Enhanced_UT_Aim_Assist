@@ -308,6 +308,8 @@ with dai.Device(pipeline) as device:
                 errorY = targetY - (gameScrnHeight / 2)
                 errorX = targetX - (gameScrnWidth / 2)
                 
+                print("calculated errorY = ", errorY)
+                print("calculated errorX = ", errorX)
 
                 '''
                 pidClass psuedo-code
@@ -329,8 +331,8 @@ with dai.Device(pipeline) as device:
                 KiX = 0  # 0.18, 0.09, 0.07, 0.05
                 KdX = 0  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                ScaleY = 0.05
-                ScaleX = 0.05
+                ScaleY = 0.033      # trial and error testing
+                ScaleX = 0.033      # trial and error testing
 
                 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
@@ -359,6 +361,7 @@ with dai.Device(pipeline) as device:
                     
                     mouseMotionY = ScaleY * pidTargetY
                     mouseMotionX = ScaleX * pidTargetX
+                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
 
                     ## Update arrays
                     mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
@@ -366,15 +369,15 @@ with dai.Device(pipeline) as device:
 
 
                     ## move mouse to point at target
-                    # AimMouseAlt(target)
+                    #AimMouseAlt(target)
                     # Move pointer relative to current position
                     mouse.move(mouseMotionX, mouseMotionY)
-                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
                     
-                    # fire at target 3 times
-                    click()
-                    click()
-                    click()
+                    if abs(pidTargetY) < 75 and abs(pidTargetX) < 75: # fire only when on-target
+                        # fire at target 3 times
+                        click()
+                        click()
+                        click()
 
                     # previousTrackTime = time.time()     # use to calculate dT between track frames
                 
