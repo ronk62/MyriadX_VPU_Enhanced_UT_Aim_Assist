@@ -153,11 +153,15 @@ with dai.Device(pipeline) as device:
     errorYarray = np.array([], dtype=np.float32)          # array to hold screen offset errorY
     pidTargetYarray = np.array([], dtype=np.float32)      # array to hold pidTargetY
     mouseMotionYarray = np.array([], dtype=np.float32)    # array to hold mouseMotionY
+    vectorYarray = np.array([0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
+    targetYprev = None
 
     targetXarray = np.array([], dtype=np.float32)         # array to hold raw screen targetX
     errorXarray = np.array([], dtype=np.float32)          # array to hold screen offset errorX
     pidTargetXarray = np.array([], dtype=np.float32)      # array to hold pidTargetX
     mouseMotionXarray = np.array([], dtype=np.float32)    # array to hold mouseMotionX
+    vectorXarray = np.array([0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
+    targetXprev = None
 
 
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
@@ -205,7 +209,9 @@ with dai.Device(pipeline) as device:
         if keyboard.is_pressed(46):     # press and hold 'c' to exit
             print("breaking loop; plotting data...")
             break
-    
+        
+        # time.sleep(0.07)    # limit to ~15 FPS
+
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
         initTime = previous_time
@@ -301,15 +307,56 @@ with dai.Device(pipeline) as device:
 
                 targetY, targetX = target
 
-                ###  
+                #####################
                 gameScrnWidth = 1600
                 gameScrnHeight = 900
+
+                ## extrapolation code, compensate for Obj detection and tracking lag
                 
-                errorY = targetY - (gameScrnHeight / 2)
-                errorX = targetX - (gameScrnWidth / 2)
+                # init prev vars for this run
+                if targetYprev == None:
+                    targetYprev = targetY
+                
+                if targetXprev == None:
+                    targetXprev = targetX
+                
+                # calculate deltas
+                targetYdelta =  targetY - targetYprev
+                targetXdelta = targetX - targetXprev
+                print("targetYdelta, targetXdelta before extrapolation ", targetYdelta, targetXdelta)
+
+                # save current target values as previous for next cycle
+                targetYprev = targetY
+                targetXprev = targetX
+
+                # do rolling update of arrays
+                np.roll(vectorYarray, -1)
+                vectorYarray[2] = targetYdelta
+                np.roll(vectorXarray, -1)
+                vectorXarray[2] = targetXdelta
+                
+                # calculate avg and extrapoate
+                targetYdeltaavg = np.average(vectorYarray)
+                targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
+                targetXdeltaavg = np.average(vectorXarray)
+                targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
+
+                # limit max Y delta to 0.4 of (gameScrnHeight / 2)
+                if targetYdelta > 0.4 * (gameScrnHeight / 2):
+                    targetYdelta = 0.4 * (gameScrnHeight / 2)
+                
+                # limit max X delta to 0.55 of (gameScrnWidth / 2)
+                if targetXdelta > 0.55 * (gameScrnWidth / 2):
+                    targetXdelta = 0.55 * (gameScrnWidth / 2)
+                
+                print("targetYdelta, targetXdelta AFTER extrapolation ", targetYdelta, targetXdelta)
+
+                errorY = targetY - ((gameScrnHeight / 2) + targetYdelta)
+                errorX = targetX - ((gameScrnWidth / 2) + targetXdelta)
                 
                 print("calculated errorY = ", errorY)
                 print("calculated errorX = ", errorX)
+
 
                 '''
                 pidClass psuedo-code
@@ -323,16 +370,16 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
-                KpY = 1  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                KiY = 0  # 0.18, 0.09, 0.07,  0.05
-                KdY = 0  # 0.03, 0.02, 0.009, 0, 0, 1
+                KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
+                KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                KpX = 1  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                KiX = 0  # 0.18, 0.09, 0.07, 0.05
-                KdX = 0  # 0.03, 0.02, 0.009, 0, 0, 1
+                KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
+                KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                ScaleY = 0.033      # trial and error testing
-                ScaleX = 0.033      # trial and error testing
+                ScaleY = 0.035      # trial and error testing
+                ScaleX = 0.045      # trial and error testing
 
                 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
@@ -373,7 +420,7 @@ with dai.Device(pipeline) as device:
                     # Move pointer relative to current position
                     mouse.move(mouseMotionX, mouseMotionY)
                     
-                    if abs(pidTargetY) < 75 and abs(pidTargetX) < 75: # fire only when on-target
+                    if abs(pidTargetY) < 80 and abs(pidTargetX) < 80: # fire only when on-target
                         # fire at target 3 times
                         click()
                         click()
@@ -386,6 +433,10 @@ with dai.Device(pipeline) as device:
 
         if trackedCount == 0:
             trackedTargFrameCount = 0
+            vectorYarray = np.array([0,0,0], dtype=np.float32)
+            vectorXarray = np.array([0,0,0], dtype=np.float32)
+            targetYprev = None
+            targetXprev = None
 
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
