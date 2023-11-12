@@ -123,6 +123,10 @@ objectTracker.passthroughTrackerFrame.link(xlinkOut.input)
 # Connect and start the pipeline
 with dai.Device(pipeline) as device:
 
+    ## use the below two lines for logging
+    # device.setLogLevel(dai.LogLevel.TRACE)
+    # device.setLogOutputLevel(dai.LogLevel.TRACE)
+
     print(device.getUsbSpeed())
 
     ### blocking=False
@@ -338,8 +342,10 @@ with dai.Device(pipeline) as device:
                 # calculate avg and extrapoate
                 targetYdeltaavg = np.average(vectorYarray)
                 targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
+                # targetYdelta = targetYdelta + 0.1 * targetYdeltaavg
                 targetXdeltaavg = np.average(vectorXarray)
                 targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
+                # targetXdelta = targetXdelta + 0.1 * targetXdeltaavg
 
                 # limit max Y delta to 0.4 of (gameScrnHeight / 2)
                 if targetYdelta > 0.4 * (gameScrnHeight / 2):
@@ -370,6 +376,7 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
+                ## best PID and scale tuning pre-11/11/2023
                 KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
                 KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
                 KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
@@ -378,8 +385,20 @@ with dai.Device(pipeline) as device:
                 KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
                 KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                ScaleY = 0.035      # trial and error testing
-                ScaleX = 0.045      # trial and error testing
+                ScaleY = 0.035        # trial and error testing
+                ScaleX = 0.045        # trial and error testing
+
+                ## experimental PID and scale tuning post-11/11/2023
+                # KpY = 0.45  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiY = 0.1   # 0.18, 0.09, 0.07,  0.05
+                # KdY = 0.05  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                # KpX = 0.45  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiX = 0.1   # 0.18, 0.09, 0.07, 0.05
+                # KdX = 0.05  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                # ScaleY = 0.0235           # trial and error testing
+                # ScaleX = 0.0245           # trial and error testing
 
                 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
