@@ -25,8 +25,8 @@ class PID:
         
 
         self.errorSum = self.errorSum + errorCurrent
-        if abs(self.errorSum) > 2000:     # clamp the errorSum (integral) at 2000
-            self.errorSum = 2000 * (abs(self.errorSum) /  self.errorSum)
+        if abs(self.errorSum) > 1000:     # clamp the errorSum (integral) at 1000
+            self.errorSum = 1000 * (abs(self.errorSum) /  self.errorSum)
         # print("self.errorSum -------------> ", self.errorSum)
         self.deltaError = errorCurrent - self.errorPrevious
         self.pidOut = (Kp * errorCurrent) + (Ki * self.errorSum) + (Kd * self.deltaError)

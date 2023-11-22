@@ -157,14 +157,14 @@ with dai.Device(pipeline) as device:
     errorYarray = np.array([], dtype=np.float32)          # array to hold screen offset errorY
     pidTargetYarray = np.array([], dtype=np.float32)      # array to hold pidTargetY
     mouseMotionYarray = np.array([], dtype=np.float32)    # array to hold mouseMotionY
-    vectorYarray = np.array([0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
+    vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
     targetYprev = None
 
     targetXarray = np.array([], dtype=np.float32)         # array to hold raw screen targetX
     errorXarray = np.array([], dtype=np.float32)          # array to hold screen offset errorX
     pidTargetXarray = np.array([], dtype=np.float32)      # array to hold pidTargetX
     mouseMotionXarray = np.array([], dtype=np.float32)    # array to hold mouseMotionX
-    vectorXarray = np.array([0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
+    vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
     targetXprev = None
 
 
@@ -335,25 +335,25 @@ with dai.Device(pipeline) as device:
 
                 # do rolling update of arrays
                 np.roll(vectorYarray, -1)
-                vectorYarray[2] = targetYdelta
+                vectorYarray[50] = targetYdelta
                 np.roll(vectorXarray, -1)
-                vectorXarray[2] = targetXdelta
+                vectorXarray[50] = targetXdelta
                 
                 # calculate avg and extrapoate
                 targetYdeltaavg = np.average(vectorYarray)
-                targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
-                # targetYdelta = targetYdelta + 0.1 * targetYdeltaavg
+                # targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
+                targetYdelta = targetYdelta + 5 * targetYdeltaavg
                 targetXdeltaavg = np.average(vectorXarray)
-                targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
-                # targetXdelta = targetXdelta + 0.1 * targetXdeltaavg
+                # targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
+                targetXdelta = targetXdelta + 5 * targetXdeltaavg
 
-                # limit max Y delta to 0.4 of (gameScrnHeight / 2)
-                if targetYdelta > 0.4 * (gameScrnHeight / 2):
-                    targetYdelta = 0.4 * (gameScrnHeight / 2)
+                # # limit max Y delta to 0.4 of (gameScrnHeight / 2)
+                # if targetYdelta > 0.4 * (gameScrnHeight / 2):
+                #     targetYdelta = 0.4 * (gameScrnHeight / 2)
                 
-                # limit max X delta to 0.55 of (gameScrnWidth / 2)
-                if targetXdelta > 0.55 * (gameScrnWidth / 2):
-                    targetXdelta = 0.55 * (gameScrnWidth / 2)
+                # # limit max X delta to 0.55 of (gameScrnWidth / 2)
+                # if targetXdelta > 0.55 * (gameScrnWidth / 2):
+                #     targetXdelta = 0.55 * (gameScrnWidth / 2)
                 
                 print("targetYdelta, targetXdelta AFTER extrapolation ", targetYdelta, targetXdelta)
 
@@ -376,29 +376,29 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
-                ## best PID and scale tuning pre-11/11/2023
-                KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
-                KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+                # ## best PID and scale tuning pre-11/11/2023
+                # KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
+                # KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
-                KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+                # KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
+                # KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                ScaleY = 0.035        # trial and error testing
-                ScaleX = 0.045        # trial and error testing
+                # ScaleY = 0.035        # trial and error testing
+                # ScaleX = 0.045        # trial and error testing
 
                 ## experimental PID and scale tuning post-11/11/2023
-                # KpY = 0.45  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiY = 0.1   # 0.18, 0.09, 0.07,  0.05
-                # KdY = 0.05  # 0.03, 0.02, 0.009, 0, 0, 1
+                KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiY = 0.01  # 0.18, 0.09, 0.07,  0.05
+                KdY = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                # KpX = 0.45  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiX = 0.1   # 0.18, 0.09, 0.07, 0.05
-                # KdX = 0.05  # 0.03, 0.02, 0.009, 0, 0, 1
+                KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiX = 0.01  # 0.18, 0.09, 0.07, 0.05
+                KdX = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
 
-                # ScaleY = 0.0235           # trial and error testing
-                # ScaleX = 0.0245           # trial and error testing
+                ScaleY = 0.0562           # trial and error testing
+                ScaleX = 0.0562           # trial and error testing
 
                 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
@@ -452,8 +452,8 @@ with dai.Device(pipeline) as device:
 
         if trackedCount == 0:
             trackedTargFrameCount = 0
-            vectorYarray = np.array([0,0,0], dtype=np.float32)
-            vectorXarray = np.array([0,0,0], dtype=np.float32)
+            vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
+            vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
             targetYprev = None
             targetXprev = None
 
@@ -482,6 +482,10 @@ with dai.Device(pipeline) as device:
         # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
         # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
         # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+
+        # ## break after first 25 tracks
+        # if len(timestampArray) == 25:
+        #     break
     
 
     ### plot the data, then exit
