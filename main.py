@@ -6,21 +6,17 @@ import depthai as dai
 import numpy as np
 import time
 import argparse
-# from PIL import ImageGrab, Image
 from Keyboard_And_Mouse_Controls import *
+from pidController import *
+import matplotlib.pyplot as plt
 import dxcam
 
 '''
 Next steps:
 - introduce process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
-- perhaps add some addaptive error correction and gains (like a pid controller would)
+- Done --> perhaps add some addaptive error correction and gains (pid controller)
 '''
-
-'''
-ref. https://github.com/ra1nty/DXcam
-'''
-camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
 
 '''
 5/11/2023 - test 1 - redo (with correct nn settings for yolo):
@@ -40,6 +36,15 @@ Results:
 - Latency trackFrame: 531.44 ms, Average latency: 495.47 ms, Std: 35.97
 
 '''
+
+'''
+ref. https://github.com/ra1nty/DXcam
+'''
+camera = dxcam.create(device_idx=0, output_idx=1)  # returns a DXCamera instance on primary monitor
+
+pidY = PID()
+pidX = PID()
+
 
 ## yolo v3 tiny label texts
 labelMap = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
@@ -100,6 +105,7 @@ objectTracker.inputDetections.setBlocking(True)
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # testing an alternative to 'ZERO_TERM_COLOR_HISTOGRAM'
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -116,6 +122,10 @@ objectTracker.passthroughTrackerFrame.link(xlinkOut.input)
 
 # Connect and start the pipeline
 with dai.Device(pipeline) as device:
+
+    ## use the below two lines for logging
+    # device.setLogLevel(dai.LogLevel.TRACE)
+    # device.setLogOutputLevel(dai.LogLevel.TRACE)
 
     print(device.getUsbSpeed())
 
@@ -138,6 +148,25 @@ with dai.Device(pipeline) as device:
     fps = 0
     detections = []
     frame = None
+
+    
+    # init np arrays
+    timestampArray = np.array([], dtype=np.float32)       # array to hold timestamps
+
+    targetYarray = np.array([], dtype=np.float32)         # array to hold raw screen targetY
+    errorYarray = np.array([], dtype=np.float32)          # array to hold screen offset errorY
+    pidTargetYarray = np.array([], dtype=np.float32)      # array to hold pidTargetY
+    mouseMotionYarray = np.array([], dtype=np.float32)    # array to hold mouseMotionY
+    vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
+    targetYprev = None
+
+    targetXarray = np.array([], dtype=np.float32)         # array to hold raw screen targetX
+    errorXarray = np.array([], dtype=np.float32)          # array to hold screen offset errorX
+    pidTargetXarray = np.array([], dtype=np.float32)      # array to hold pidTargetX
+    mouseMotionXarray = np.array([], dtype=np.float32)    # array to hold mouseMotionX
+    vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
+    targetXprev = None
+
 
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
         return cv2.resize(arr, shape).transpose(2, 0, 1).flatten()
@@ -167,7 +196,8 @@ with dai.Device(pipeline) as device:
         dt = time.time() - previous_time
         previous_time = time.time()
         return dt, previous_time
-    
+        
+
     baseTs = time.monotonic()
     simulatedFps = 30
     # inputFrameShape = (1920, 1080)
@@ -175,29 +205,21 @@ with dai.Device(pipeline) as device:
 
     diffs = np.array([])
 
-    ## initialize some 'lead the target' vars
-    prevTarget = (450, 800)
-    initTargetSpeedCalc = False
-    xTargetSpeed = 0
-    yTargetSpeed = 0
-    leadTargFrameCount = 0   # only move mouse after 5 tracked frames in a row ???
-    firstLoopInitT = time.time()
-    frameCount = 0
-    firstFrameToTargT = 0
-    dTfirstFrameToTarget = 0
+    ### initialize some targeting vars
+    trackedTargFrameCount = 0
+
 
     while True:
+        if keyboard.is_pressed(46):     # press and hold 'c' to exit
+            print("breaking loop; plotting data...")
+            break
+        
+        # time.sleep(0.07)    # limit to ~15 FPS
+
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
         initTime = previous_time
-        # frame = capture_window_PIL()
         frame = capture_window_dxcam()
-
-        ###
-        frameCount += 1
-        if frameCount == 1:
-            firstFrameToTargT = time.time()
-        ###
 
         dtCapFrame, previous_time = deltaT(previous_time)
         eFPScapFrame = 1 / (dtCapFrame + 0.000000001)
@@ -225,15 +247,6 @@ with dai.Device(pipeline) as device:
         manip = qManip.get()
         inDet = qDet.get()
 
-        # ###
-        # testLatency = inDet.getTimestamp()
-        # testDaiClockNow = dai.Clock.now()
-        # deltaTlatency = testDaiClockNow - testLatency
-        # print("testLatency = ", testLatency)
-        # print("testDaiClockNow = ", testDaiClockNow)
-        # print("deltaTlatency = ", deltaTlatency)
-        # ###
-
         counter+=1
         current_time = time.monotonic()
         if (current_time - startTime) > 1 :
@@ -244,26 +257,15 @@ with dai.Device(pipeline) as device:
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
 
-        # ###
-        # testLatency = inDet.getTimestamp()
-        # testDaiClockNow = dai.Clock.now()
-        # deltaTlatency = testDaiClockNow - testLatency
-        # print("testLatency = ", testLatency)
-        # print("testDaiClockNow = ", testDaiClockNow)
-        # print("deltaTlatency = ", deltaTlatency)
-        # ###
-
-        # # Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - inDet.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency Det NN: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
- 
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
         eFPSnnDetections = 1 / (dtNNdetections + 0.000000001)
 
         color = (255, 0, 0)
-        trackerFrame = trackFrame.getCvFrame()
+        trackerFrame = trackFrame.getCvFrame()      # orig/actual trackerFrame
+        # trackerFrame = capture_window_dxcam()       # game frame reCapture
+        if not np.any(trackerFrame):
+            continue
         trackletsData = track.tracklets
 
         trackedCount = 0
@@ -284,6 +286,7 @@ with dai.Device(pipeline) as device:
 
             if tStatusName == 'TRACKED':
                 trackedCount += 1
+                # trackedTargFrameCount += 1
 
                 cv2.putText(trackerFrame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 cv2.putText(trackerFrame, f"ID: {[t.id]}", (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
@@ -296,117 +299,170 @@ with dai.Device(pipeline) as device:
                 bbox_width = (x2 - x1)
                 bbox_xcenter = x1 + bbox_width/2
 
-                ## uncomment for ROI targeting use
+                ## uncomment following 2 lines and next the subsequent lines for ROI targeting use (else, full-screen targeting)
                 # if bbox_ycenter > 200 and bbox_ycenter < 700:
                 #     if bbox_xcenter > 450 and bbox_xcenter < 1150:
                 #         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
 
-                        
-                #         if keyboard.is_pressed(45):
-                #             print(target)
-                #             ## move mouse to point at target
-                #             AimMouseAlt(target)
-                #             # fire at target 3 times
-                #             # print(target)
-                #             click()
-                #             click()
-                #             click()
-                ##
-
-                dTfirstFrameToTarget = time.time() - firstFrameToTargT
-                dTfirstLoopInit = time.time() - firstLoopInitT
 
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
 
-                ## for testing
-                if initTargetSpeedCalc:
-                    leadTargFrameCount += 1
-                    if leadTargFrameCount == 1:
-                        dTprevTack = time.time()    # capture time of first occurence of a track in a series
+                print("target before pids applied = ", target)
 
-                    if leadTargFrameCount > 1:
-                        prevTargetY, prevTargetX = prevTarget
+                targetY, targetX = target
 
-                    
-                    if leadTargFrameCount >= 7:
-                        targetY, targetX = target
-                        dY = targetY - prevTargetY
-                        dX = targetX - prevTargetX
-                        # dT = (time.time() - dTprevTack) + 0.9000000001  # track loop time from while loop - not correct for this calc
-                        dT = (time.time() - dTprevTack) + 0.0000000001  # track loop time from while loop - not correct for this calc
-                        # time.sleep(1)
-                        dTprevTack = time.time()    # capture time of all subsequent occurences of a track in a series
+                #####################
+                gameScrnWidth = 1600
+                gameScrnHeight = 900
 
-                        targetSpeedY =  dY / dT
-                        targetSpeedX =  dX / dT
-                        # targetLeadY = targetY + (1 * (targetSpeedY * dT))
-                        targetLeadY = targetY + dT * dY
-                        # targetLeadX = targetX + (1 * (targetSpeedX * dT))
-                        targetLeadX = targetX + dT * dX
-
-                        prevTarget = target
-
-                        ## for testing
-                        print("dY = ", dY)
-                        print("dX = ", dX)
-                        print("dT = ", dT)
-                        print("targetSpeedY = ", targetSpeedY)
-                        print("targetSpeedX = ", targetSpeedX)
-                        print("targetLeadY = ", targetLeadY)
-                        print("targetLeadX = ", targetLeadX)
-                        print("target before lead applied = ", target)
-
-                        target = (targetLeadY, targetLeadX)      # target based on calculated dx, dy, dt (lead the target)
-
-                        ## for testing
-                        print("target after lead applied = ", target)
-
-
-                        print("target is -> ", target)
-
-                        if leadTargFrameCount == 30:
-                            print(leadTargFrameCount)
-                        else:
-                            print(leadTargFrameCount)
-
-                        # # Show Latency in miliseconds 
-                        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-                        # diffs = np.append(diffs, latencyMs)
-                        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
-
-
-                    if keyboard.is_pressed(45):
-                        ## move mouse to point at target
-                        AimMouseAlt(target)
-                        
-                        # fire at target 3 times
-                        print(target)
-                        click()
-                        click()
-                        click()
-                    
+                ## extrapolation code, compensate for Obj detection and tracking lag
                 
-                ## setup var for next iteration
-                initTargetSpeedCalc = True
+                # init prev vars for this run
+                if targetYprev == None:
+                    targetYprev = targetY
+                
+                if targetXprev == None:
+                    targetXprev = targetX
+                
+                # calculate deltas
+                targetYdelta =  targetY - targetYprev
+                targetXdelta = targetX - targetXprev
+                print("targetYdelta, targetXdelta before extrapolation ", targetYdelta, targetXdelta)
+
+                # save current target values as previous for next cycle
+                targetYprev = targetY
+                targetXprev = targetX
+
+                # do rolling update of arrays
+                np.roll(vectorYarray, -1)
+                vectorYarray[50] = targetYdelta
+                np.roll(vectorXarray, -1)
+                vectorXarray[50] = targetXdelta
+                
+                # calculate avg and extrapoate
+                targetYdeltaavg = np.average(vectorYarray)
+                # targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
+                targetYdelta = targetYdelta + 5 * targetYdeltaavg
+                targetXdeltaavg = np.average(vectorXarray)
+                # targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
+                targetXdelta = targetXdelta + 5 * targetXdeltaavg
+
+                # # limit max Y delta to 0.4 of (gameScrnHeight / 2)
+                # if targetYdelta > 0.4 * (gameScrnHeight / 2):
+                #     targetYdelta = 0.4 * (gameScrnHeight / 2)
+                
+                # # limit max X delta to 0.55 of (gameScrnWidth / 2)
+                # if targetXdelta > 0.55 * (gameScrnWidth / 2):
+                #     targetXdelta = 0.55 * (gameScrnWidth / 2)
+                
+                print("targetYdelta, targetXdelta AFTER extrapolation ", targetYdelta, targetXdelta)
+
+                errorY = targetY - ((gameScrnHeight / 2) + targetYdelta)
+                errorX = targetX - ((gameScrnWidth / 2) + targetXdelta)
+                
+                print("calculated errorY = ", errorY)
+                print("calculated errorX = ", errorX)
+
+
+                '''
+                pidClass psuedo-code
+                --------------------
+                vars: Kp, Ki, Kd, error, previousError
+
+                instantiate pidY and pidX from pidClass
+                extract Y and X from 'target' var
+                pass current Y error to pidY
+                pass current X error to pidX
+                recombine Y and X results into 'target'
+                '''
+
+                # ## best PID and scale tuning pre-11/11/2023
+                # KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
+                # KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                # KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                # KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
+                # KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                # ScaleY = 0.035        # trial and error testing
+                # ScaleX = 0.045        # trial and error testing
+
+                ## experimental PID and scale tuning post-11/11/2023
+                KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiY = 0.01  # 0.18, 0.09, 0.07,  0.05
+                KdY = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
+                KiX = 0.01  # 0.18, 0.09, 0.07, 0.05
+                KdX = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
+
+                ScaleY = 0.0562           # trial and error testing
+                ScaleX = 0.0562           # trial and error testing
+
+                
+                if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
+                    trackedTargFrameCount += 1
+
+                    if trackedTargFrameCount == 1:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, True)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, True)
+                    else:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, False)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, False)
+                    
+
+                    ## Update arrays
+                    currentTime = time.time()
+                    timestampArray = np.append(timestampArray, currentTime)
+                    targetYarray = np.append(targetYarray, targetY)
+                    targetXarray = np.append(targetXarray, targetX)
+                    errorYarray = np.append(errorYarray, errorY)
+                    errorXarray = np.append(errorXarray, errorX)
+                    pidTargetYarray = np.append(pidTargetYarray, pidTargetY)
+                    pidTargetXarray = np.append(pidTargetXarray, pidTargetX)
+                    
+                    target = (pidTargetY, pidTargetX)
+                    print("target after pids applied = ", target)
+                    
+                    mouseMotionY = ScaleY * pidTargetY
+                    mouseMotionX = ScaleX * pidTargetX
+                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
+
+                    ## Update arrays
+                    mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
+                    mouseMotionXarray = np.append(mouseMotionXarray, mouseMotionX)
+
+
+                    ## move mouse to point at target
+                    #AimMouseAlt(target)
+                    # Move pointer relative to current position
+                    mouse.move(mouseMotionX, mouseMotionY)
+                    
+                    if abs(pidTargetY) < 80 and abs(pidTargetX) < 80: # fire only when on-target
+                        # fire at target 3 times
+                        click()
+                        click()
+                        click()
+
+                    # previousTrackTime = time.time()     # use to calculate dT between track frames
+                
+                else:
+                    trackedTargFrameCount = 0
 
         if trackedCount == 0:
-            ## re-initialize some targeting vars
-            initTargetSpeedCalc = False
-            xTargetSpeed = 0
-            yTargetSpeed = 0
-            leadTargFrameCount = 0
+            trackedTargFrameCount = 0
+            vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
+            vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
+            targetYprev = None
+            targetXprev = None
+
 
         cv2.putText(trackerFrame, "Fps: {:.2f}".format(fps), (2, trackerFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
 
         dtTrackletsData, previous_time = deltaT(previous_time)
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
-        # # Show Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency trackFrame: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
-
-        ## use with dxcam version
         if frame.size > 1:
             cv2.imshow("tracker", trackerFrame)
 
@@ -421,8 +477,58 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+
+        # ## break after first 25 tracks
+        # if len(timestampArray) == 25:
+        #     break
+    
+
+    ### plot the data, then exit
+    # # convert values in timestampArray to dT
+    # print("converting values in timestampArray to dT...")
+    # for i in range(len(timestampArray)):
+    #     timestampArray[i] = timestampArray[i] - timestampArray[0]
+
+    ## Create plots
+    # raw-target and error values
+    plt.figure(1)
+    plt.plot(timestampArray,targetYarray, label='targetYarray')
+    plt.plot(timestampArray,targetXarray, label='targetXarray')
+    plt.plot(timestampArray,errorYarray, label='errorYarray')
+    plt.plot(timestampArray,errorXarray, label='errorXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('raw-target and error values')
+    plt.title('target and error values over time')
+    plt.legend()
+    # plt.show()
+
+    # pid-target values
+    plt.figure(2)
+    plt.plot(timestampArray,pidTargetYarray, label='pidTargetYarray')
+    plt.plot(timestampArray,pidTargetXarray, label='pidTargetXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('pid-target values')
+    plt.title('pid-target values over time')
+    plt.legend()
+    # plt.show()
+
+    # mouseMotion values
+    plt.figure(3)
+    plt.plot(timestampArray,mouseMotionYarray, label='mouseMotionYarray')
+    plt.plot(timestampArray,mouseMotionXarray, label='mouseMotionXarray')
+
+    plt.xlabel('dT')
+    plt.ylabel('mouseMotion values')
+    plt.title('mouseMotion values over time')
+    plt.legend()
+    plt.show()
+
+    print("exiting...")
+    exit()

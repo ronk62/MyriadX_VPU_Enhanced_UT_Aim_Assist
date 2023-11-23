@@ -57,32 +57,3 @@ def AimMouseAlt(target):
     print("y_distance, x_distance ", y_distance, x_distance)
     # Move pointer relative to current position
     mouse.move(x_distance, y_distance)
-
-'''
-save for ref only
-
-def AimMouseAlt(target, xErrorSum, xErrorLast, yErrorSum, yErrorLast):
-    offsetY, offsetX = target
-    realUT99fov = RealFov(UT99FOV, gameScrnWidth, gameScrnHeight)
-
-    yaw = coord2deg(offsetX - gameScrnWidth / 2, realUT99fov, gameScrnWidth)
-    pitch = coord2deg(offsetY - gameScrnHeight / 2, realUT99fov, gameScrnWidth)
-
-    ## add pid controller
-    # pid values
-    Kp = 0.6
-    Ki = 0.0
-    Kd = 0.0
-    iX = Ki * xErrorSum
-    dX = Kd * xErrorLast
-    iY = Ki * yErrorSum
-    dY = Kd * yErrorLast
-    # y_distance = int(pitch * 0.60)
-    y_distance = int((pitch * Kp) + (pitch * iY) + (pitch * dY))      # add pid
-    # x_distance = int(yaw * 0.65)
-    x_distance = int((yaw * Kp) + (yaw * iX) + (yaw * dX))            # add pid
-
-    print("y_distance, x_distance ", y_distance, x_distance)
-    # Move pointer relative to current position
-    mouse.move(x_distance, y_distance)
-'''

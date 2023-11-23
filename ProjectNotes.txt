@@ -1,0 +1,6 @@
+11/12/2023, some scaling options to try for mouse-movements
+
+https://math.stackexchange.com/questions/158487/function-that-magnifies-small-changes-and-compresses-large-changes
+
+
+
