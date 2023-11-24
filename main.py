@@ -214,7 +214,8 @@ with dai.Device(pipeline) as device:
             print("breaking loop; plotting data...")
             break
         
-        time.sleep(0.0333)    # limit to ~30 FPS
+        # time.sleep(0.0333)    # limit to ~30 FPS
+        time.sleep(0.09)    # limit to 1/n FPS
 
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
