@@ -202,6 +202,7 @@ with dai.Device(pipeline) as device:
     simulatedFps = 30
     # inputFrameShape = (1920, 1080)
     inputFrameShape = (1600, 900)
+    # inputFrameShape = (416, 416)
 
     diffs = np.array([])
 
@@ -210,13 +211,15 @@ with dai.Device(pipeline) as device:
 
 
     while True:
+    # for countIter in range(40):         ## for latency testing
         if keyboard.is_pressed(46):     # press and hold 'c' to exit
             print("breaking loop; plotting data...")
             break
         
-        # time.sleep(0.0333)    # limit to ~30 FPS
-        time.sleep(0.09)    # limit to 1/n FPS
-
+        time.sleep(0.0333)    # limit to ~30 FPS
+        # time.sleep(0.09)    # limit to 1/n FPS
+        # time.sleep(1)    # limit to 1/n FPS
+        
         previous_time = time.time()
         _, previous_time = deltaT(previous_time)
         initTime = previous_time
@@ -241,6 +244,7 @@ with dai.Device(pipeline) as device:
         qIn.send(img)
 
         trackFrame = trackerFrameQ.tryGet()
+        # trackFrame = trackerFrameQ.get()    ## for latency testing
         if trackFrame is None:
             continue
 
@@ -257,6 +261,12 @@ with dai.Device(pipeline) as device:
 
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
+
+        ## for latency testing
+        # Latency in miliseconds 
+        # latencyMs = (dai.Clock.now() - track.getTimestamp()).total_seconds() * 1000
+        # diffs = np.append(diffs, latencyMs)
+        # print('Latency: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
