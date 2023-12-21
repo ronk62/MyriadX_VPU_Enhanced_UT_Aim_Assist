@@ -13,7 +13,9 @@ ref. https://www.unknowncheats.me/forum/apex-legends/495561-calculate-mouse-move
 '''
 gameScrnWidth = 1600
 gameScrnHeight = 900
-UT99FOV = 90
+UT99FOV = 75
+# UT99FOV = 90
+# UT99FOV = 120
 UT99sens = 1
 UTfull360 = 16363.0 / UT99sens
 
@@ -57,3 +59,4 @@ def AimMouseAlt(target):
     print("y_distance, x_distance ", y_distance, x_distance)
     # Move pointer relative to current position
     mouse.move(x_distance, y_distance)
+    return y_distance, x_distance
