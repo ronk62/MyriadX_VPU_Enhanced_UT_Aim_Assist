@@ -201,8 +201,8 @@ with dai.Device(pipeline) as device:
     baseTs = time.monotonic()
     simulatedFps = 30
     # inputFrameShape = (1920, 1080)
-    inputFrameShape = (1600, 900)
-    # inputFrameShape = (416, 416)
+    # inputFrameShape = (1600, 900)
+    inputFrameShape = (416, 416)
 
     diffs = np.array([])
 
@@ -231,11 +231,11 @@ with dai.Device(pipeline) as device:
         if frame.size < 2:  # stop processing this iteration when frame is (essentially) empty
             continue
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        inframe = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         img = dai.ImgFrame()
         img.setType(dai.ImgFrame.Type.BGR888p)
-        img.setData(to_planar(frame, inputFrameShape))
+        img.setData(to_planar(inframe, inputFrameShape))
         img.setTimestamp(baseTs)
         baseTs += 1/simulatedFps
 
@@ -277,6 +277,11 @@ with dai.Device(pipeline) as device:
         # trackerFrame = capture_window_dxcam()       # game frame reCapture
         if not np.any(trackerFrame):
             continue
+
+        #####
+        trackerFrame = frame
+        #####
+
         trackletsData = track.tracklets
 
         trackedCount = 0
@@ -453,7 +458,7 @@ with dai.Device(pipeline) as device:
                     # # Move pointer relative to current position
                     # mouse.move(mouseMotionX, mouseMotionY)
                     
-                    if 370 < targetY < 530 and 720 < targetX < 880: # fire only when on-target
+                    if 400 < targetY < 500 and 750 < targetX < 850: # fire only when on-target
                         # fire at target 3 times
                         click()
                         click()
@@ -481,7 +486,9 @@ with dai.Device(pipeline) as device:
         eFPStrackletsData = 1 / (dtTrackletsData + 0.000000001)
 
         if frame.size > 1:
-            cv2.imshow("tracker", trackerFrame)
+            # cv2.imshow("tracker", trackerFrame)
+            trackerFrame = cv2.cvtColor(trackerFrame, cv2.COLOR_RGB2BGR)
+            cv2.imshow("origFrameWithBBox", trackerFrame)
 
             if cv2.waitKey(1) == ord('q'):
                 break
