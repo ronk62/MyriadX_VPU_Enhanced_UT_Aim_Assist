@@ -12,9 +12,20 @@ import matplotlib.pyplot as plt
 import dxcam
 
 '''
+Significantly reduced latency (previously ~500 ms); did this by changing inputFrameShape from (1600, 900) to (416, 416)
+- in theory, reducing inputFrameShape minimized the data sent to the oak-d over USB, while retaining the data size/shape
+  needed for the yolo model input layer
+- also changed the displayed final frame to be the current dxcam capture frame, overlayed with the tracker bbox
+- derived the target location via same logic and data as before (trackletsData = track.tracklets)
+- one remaining symptom, as of 12/20/2023, is that the tracker gets confused when there is a high-delta
+  mouse/camera movement - the tracker bbox shifts in the opposite direction, causing ocsilations
+-- possible remedy is to reinstitute trajectory extrapolation, which averages the delta mouse/cam movements
+   and then extrapolates expected target position
+
 Next steps:
-- introduce process to get speed and trajectory of target (dx, dy, dt) and
+- Uncommented the worl already done and retune gains -->  introduce process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
+- replace my custom and flakey PID controller with easyPID or some such existing lib
 - Done --> perhaps add some addaptive error correction and gains (pid controller)
 '''
 
