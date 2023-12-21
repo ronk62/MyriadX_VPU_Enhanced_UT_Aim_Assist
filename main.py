@@ -18,7 +18,7 @@ Significantly reduced latency (previously ~500 ms); did this by changing inputFr
 - also changed the displayed final frame to be the current dxcam capture frame, overlayed with the tracker bbox
 - derived the target location via same logic and data as before (trackletsData = track.tracklets)
 - one remaining symptom, as of 12/20/2023, is that the tracker gets confused when there is a high-delta
-  mouse/camera movement - the tracker bbox shifts in the opposite direction, causing ocsilations
+  mouse/camera movement - the tracker bbox shifts in the same direction as mouse, causing overshoot and ocsilations
 -- possible remedy is to reinstitute trajectory extrapolation, which averages the delta mouse/cam movements
    and then extrapolates expected target position
 
