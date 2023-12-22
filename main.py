@@ -273,9 +273,11 @@ with dai.Device(pipeline) as device:
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
 
-        ## for latency testing
+        ## for latency testing  <-- note: 12/22/2023, this test does not work correctly with 
+        ##                                configurations with frame passed from host to oak-d
         # Latency in miliseconds 
         # latencyMs = (dai.Clock.now() - track.getTimestamp()).total_seconds() * 1000
+        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
         # diffs = np.append(diffs, latencyMs)
         # print('Latency: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
