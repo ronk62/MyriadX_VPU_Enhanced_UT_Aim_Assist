@@ -114,10 +114,12 @@ objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
 objectTracker.inputDetections.setBlocking(True)
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
-# possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
-objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
-# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # testing an alternative to 'ZERO_TERM_COLOR_HISTOGRAM'
-# take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
+## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
+objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+# objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_KCF)  # DON'T USE this one; WORST latency (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+# objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+## take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
 # Linking
