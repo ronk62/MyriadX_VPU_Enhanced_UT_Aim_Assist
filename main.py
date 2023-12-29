@@ -23,7 +23,7 @@ Significantly reduced latency (previously ~500 ms); did this by changing inputFr
    and then extrapolates expected target position
 
 Next steps:
-- Uncommented the worl already done and retune gains -->  introduce process to get speed and trajectory of target (dx, dy, dt) and
+- Uncommented the work already done and retune gains -->  introduce process to get speed and trajectory of target (dx, dy, dt) and
   lead the target
 - replace my custom and flakey PID controller with easyPID or some such existing lib
 - Done --> perhaps add some addaptive error correction and gains (pid controller)
@@ -330,10 +330,20 @@ with dai.Device(pipeline) as device:
                 bbox_width = (x2 - x1)
                 bbox_xcenter = x1 + bbox_width/2
 
-                ## uncomment following 2 lines and next the subsequent lines for ROI targeting use (else, full-screen targeting)
-                # if bbox_ycenter > 200 and bbox_ycenter < 700:
-                #     if bbox_xcenter > 450 and bbox_xcenter < 1150:
-                #         target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))
+                ## uncomment following 3 lines to ignore downed targets (based on aspect ratio)
+                if bbox_height < 1.1 * bbox_width:
+                    print("ignore downed targets based on aspect ratio", (bbox_height, 1.1 * bbox_width))
+                    continue
+                
+                ## uncomment following 6 lines for ROI targeting use (else, full-screen targeting)
+                # if bbox_ycenter < 200 or bbox_ycenter > 700:
+                #     print("bbox_ycenter not withing RIO")
+                #     continue
+                # if bbox_xcenter < 450 or bbox_xcenter > 1150:
+                #     print("bbox_xcenter not withing RIO")
+                #     continue
+
+                    
 
 
                 target = (int(y1 + 0.25 * bbox_height), int(bbox_xcenter))      # target based on raw detection and track bbox
