@@ -337,10 +337,10 @@ with dai.Device(pipeline) as device:
                 
                 ## uncomment following 6 lines for ROI targeting use (else, full-screen targeting)
                 # if bbox_ycenter < 200 or bbox_ycenter > 700:
-                #     print("bbox_ycenter not withing RIO")
+                #     print("bbox_ycenter not within RIO")
                 #     continue
                 # if bbox_xcenter < 450 or bbox_xcenter > 1150:
-                #     print("bbox_xcenter not withing RIO")
+                #     print("bbox_xcenter not within RIO")
                 #     continue
 
                     
@@ -368,44 +368,44 @@ with dai.Device(pipeline) as device:
 
                 ######
 
-                # # calculate deltas
-                # targetYdelta =  targetY - targetYprev
-                # targetXdelta = targetX - targetXprev
-                # print("targetYdelta, targetXdelta before extrapolation ", targetYdelta, targetXdelta)
+                # calculate deltas
+                targetYdelta =  targetY - targetYprev
+                targetXdelta = targetX - targetXprev
+                print("targetYdelta, targetXdelta before extrapolation ", targetYdelta, targetXdelta)
 
                 # save current target values as previous for next cycle
                 targetYprev = targetY
                 targetXprev = targetX
 
-                # # do rolling update of arrays
-                # np.roll(vectorYarray, -1)
-                # vectorYarray[50] = targetYdelta
-                # np.roll(vectorXarray, -1)
-                # vectorXarray[50] = targetXdelta
+                # do rolling update of arrays
+                vectorYarray = np.roll(vectorYarray, -1)
+                vectorYarray[50] = targetYdelta
+                vectorXarray = np.roll(vectorXarray, -1)
+                vectorXarray[50] = targetXdelta
                 
-                # # calculate avg and extrapoate
-                # targetYdeltaavg = np.average(vectorYarray)
-                # # targetYdelta = targetYdelta + 0.45 * targetYdeltaavg
-                # targetYdelta = targetYdelta + 5 * targetYdeltaavg
-                # targetXdeltaavg = np.average(vectorXarray)
-                # # targetXdelta = targetXdelta + 0.85 * targetXdeltaavg
-                # targetXdelta = targetXdelta + 5 * targetXdeltaavg
+                # calculate avg and extrapoate
+                targetYdeltaavg = np.average(vectorYarray)
+                targetYdelta = targetYdelta + 5 * targetYdeltaavg
 
-                # # limit max Y delta to 0.4 of (gameScrnHeight / 2)
+                targetXdeltaavg = np.average(vectorXarray)
+                targetXdelta = targetXdelta + 5 * targetXdeltaavg
+
+
+                # ## limit max Y delta to 0.4 of (gameScrnHeight / 2)
                 # if targetYdelta > 0.4 * (gameScrnHeight / 2):
                 #     targetYdelta = 0.4 * (gameScrnHeight / 2)
                 
-                # # limit max X delta to 0.55 of (gameScrnWidth / 2)
+                # ## limit max X delta to 0.55 of (gameScrnWidth / 2)
                 # if targetXdelta > 0.55 * (gameScrnWidth / 2):
                 #     targetXdelta = 0.55 * (gameScrnWidth / 2)
                 
-                # print("targetYdelta, targetXdelta AFTER extrapolation ", targetYdelta, targetXdelta)
+                print("targetYdelta, targetXdelta AFTER extrapolation ", targetYdelta, targetXdelta)
 
-                # errorY = targetY - ((gameScrnHeight / 2) + targetYdelta)
-                # errorX = targetX - ((gameScrnWidth / 2) + targetXdelta)
+                errorY = targetY + targetYdelta
+                errorX = targetX + targetXdelta
                 
-                # print("calculated errorY = ", errorY)
-                # print("calculated errorX = ", errorX)
+                print("calculated errorY = ", errorY)
+                print("calculated errorX = ", errorX)
 
 
                 '''
@@ -420,40 +420,28 @@ with dai.Device(pipeline) as device:
                 recombine Y and X results into 'target'
                 '''
 
-                # ## best PID and scale tuning pre-11/11/2023
-                # KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiY = 0.02  # 0.18, 0.09, 0.07,  0.05
-                # KdY = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+                ## experimental PID and scale tuning post-12/28/2023
+                KpY = 1  # previously tried vals (none)
+                KiY = 0  # previously tried vals (none)
+                KdY = 0  # previously tried vals (none)
 
-                # KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiX = 0.02  # 0.18, 0.09, 0.07, 0.05
-                # KdX = 0.02  # 0.03, 0.02, 0.009, 0, 0, 1
+                KpX = 1  #  previously tried vals (none)
+                KiX = 0  #  previously tried vals (none)
+                KdX = 0  #  previously tried vals (none)
 
-                # ScaleY = 0.035        # trial and error testing
-                # ScaleX = 0.045        # trial and error testing
-
-                # ## experimental PID and scale tuning post-11/11/2023
-                # KpY = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiY = 0.01  # 0.18, 0.09, 0.07,  0.05
-                # KdY = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
-
-                # KpX = 0.55  # 0.8, 0.75, 0.85, 0.9, 0.85, 1
-                # KiX = 0.01  # 0.18, 0.09, 0.07, 0.05
-                # KdX = 0.01  # 0.03, 0.02, 0.009, 0, 0, 1
-
-                # ScaleY = 0.0562           # trial and error testing
-                # ScaleX = 0.0562           # trial and error testing
+                ScaleY = 1           # trial and error testing
+                ScaleX = 1           # trial and error testing
 
                 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
                     trackedTargFrameCount += 1
 
-                    # if trackedTargFrameCount == 1:
-                    #     pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, True)
-                    #     pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, True)
-                    # else:
-                    #     pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, False)
-                    #     pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, False)
+                    if trackedTargFrameCount == 1:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, True)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, True)
+                    else:
+                        pidTargetY = pidY.computePidOut(KpY, KiY, KdY, errorY, False)
+                        pidTargetX = pidX.computePidOut(KpX, KiX, KdX, errorX, False)
                     
 
                     ## Update arrays
@@ -461,36 +449,29 @@ with dai.Device(pipeline) as device:
                     timestampArray = np.append(timestampArray, currentTime)
                     targetYarray = np.append(targetYarray, targetY)
                     targetXarray = np.append(targetXarray, targetX)
-                    # errorYarray = np.append(errorYarray, errorY)
-                    # errorXarray = np.append(errorXarray, errorX)
-                    # pidTargetYarray = np.append(pidTargetYarray, pidTargetY)
-                    # pidTargetXarray = np.append(pidTargetXarray, pidTargetX)
+                    errorYarray = np.append(errorYarray, errorY)
+                    errorXarray = np.append(errorXarray, errorX)
+                    pidTargetYarray = np.append(pidTargetYarray, pidTargetY)
+                    pidTargetXarray = np.append(pidTargetXarray, pidTargetX)
                     
-                    # target = (pidTargetY, pidTargetX)
-                    # print("target after pids applied = ", target)
+                    target = (pidTargetY, pidTargetX)
+                    print("target after pids applied = ", target)
                     
-                    # mouseMotionY = ScaleY * pidTargetY
-                    # mouseMotionX = ScaleX * pidTargetX
-                    # print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
-
-                    # ## Update arrays
-                    # mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
-                    # mouseMotionXarray = np.append(mouseMotionXarray, mouseMotionX)
+                    mouseMotionY = ScaleY * pidTargetY
+                    mouseMotionX = ScaleX * pidTargetX
+                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
 
 
                     ## move mouse to point at target
                     mouseMotionY, mouseMotionX =AimMouseAlt(target)
-                    # # Move pointer relative to current position
-                    # mouse.move(mouseMotionX, mouseMotionY)
-                    
+                                        
                     if 400 < targetY < 500 and 750 < targetX < 850: # fire only when on-target
                         # fire at target 3 times
                         click()
                         click()
                         click()
 
-                    ## Update vars and arrays
-                    # previousTrackTime = time.time()     # use to calculate dT between track frames
+                    ## Update mouseMotion arrays
                     mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
                     mouseMotionXarray = np.append(mouseMotionXarray, mouseMotionX)
                 
@@ -548,8 +529,8 @@ with dai.Device(pipeline) as device:
     plt.figure(1)
     plt.plot(timestampArray,targetYarray, label='targetYarray')
     plt.plot(timestampArray,targetXarray, label='targetXarray')
-    # plt.plot(timestampArray,errorYarray, label='errorYarray')
-    # plt.plot(timestampArray,errorXarray, label='errorXarray')
+    plt.plot(timestampArray,errorYarray, label='errorYarray')
+    plt.plot(timestampArray,errorXarray, label='errorXarray')
 
     plt.xlabel('dT')
     plt.ylabel('raw-target values')
@@ -558,15 +539,15 @@ with dai.Device(pipeline) as device:
     # plt.show()
 
     # # pid-target values
-    # plt.figure(2)
-    # plt.plot(timestampArray,pidTargetYarray, label='pidTargetYarray')
-    # plt.plot(timestampArray,pidTargetXarray, label='pidTargetXarray')
+    plt.figure(2)
+    plt.plot(timestampArray,pidTargetYarray, label='pidTargetYarray')
+    plt.plot(timestampArray,pidTargetXarray, label='pidTargetXarray')
 
-    # plt.xlabel('dT')
-    # plt.ylabel('pid-target values')
-    # plt.title('pid-target values over time')
-    # plt.legend()
-    # # plt.show()
+    plt.xlabel('dT')
+    plt.ylabel('pid-target values')
+    plt.title('pid-target values over time')
+    plt.legend()
+    # plt.show()
 
     # mouseMotion values
     plt.figure(3)
