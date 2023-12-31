@@ -432,9 +432,12 @@ with dai.Device(pipeline) as device:
                 ScaleX = 1  # trial and error testing
 
 
-                errorY = errorY * ScaleY
-                errorX = errorX * ScaleX
-                print("Scaled and extrapolated errorY, errorX = ", errorY, errorX)
+                ## scaling the error terms is a FAIL; should perhaps update var names back to target-blah
+                ## PID calculations (12/20/2023) also are a FAIL with current extrapolation and targeting scheme
+                ## might be worth trying to PID and scale the resulting mouse motion values
+                # errorY = errorY * ScaleY
+                # errorX = errorX * ScaleX
+                # print("Scaled and extrapolated errorY, errorX = ", errorY, errorX)
 
 
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
