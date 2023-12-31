@@ -170,14 +170,16 @@ with dai.Device(pipeline) as device:
     errorYarray = np.array([], dtype=np.float32)          # array to hold screen offset errorY
     pidTargetYarray = np.array([], dtype=np.float32)      # array to hold pidTargetY
     mouseMotionYarray = np.array([], dtype=np.float32)    # array to hold mouseMotionY
-    vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
+    # vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
+    vectorYarray = np.array([0,0,0,0,0], dtype=np.float32)    # array to hold last n targetYdelta values
     targetYprev = None
 
     targetXarray = np.array([], dtype=np.float32)         # array to hold raw screen targetX
     errorXarray = np.array([], dtype=np.float32)          # array to hold screen offset errorX
     pidTargetXarray = np.array([], dtype=np.float32)      # array to hold pidTargetX
     mouseMotionXarray = np.array([], dtype=np.float32)    # array to hold mouseMotionX
-    vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
+    # vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
+    vectorXarray = np.array([0,0,0,0,0], dtype=np.float32)    # array to hold last n targetXdelta values
     targetXprev = None
 
 
@@ -331,7 +333,7 @@ with dai.Device(pipeline) as device:
                 bbox_xcenter = x1 + bbox_width/2
 
                 ## uncomment following 3 lines to ignore downed targets (based on aspect ratio)
-                if bbox_height < 1.1 * bbox_width:
+                if bbox_height < 1.2 * bbox_width:
                     print("ignore downed targets based on aspect ratio", (bbox_height, 1.1 * bbox_width))
                     continue
                 
@@ -379,16 +381,16 @@ with dai.Device(pipeline) as device:
 
                 # do rolling update of arrays
                 vectorYarray = np.roll(vectorYarray, -1)
-                vectorYarray[50] = targetYdelta
+                vectorYarray[4] = targetYdelta
                 vectorXarray = np.roll(vectorXarray, -1)
-                vectorXarray[50] = targetXdelta
+                vectorXarray[4] = targetXdelta
                 
                 # calculate avg and extrapoate
                 targetYdeltaavg = np.average(vectorYarray)
-                targetYdelta = targetYdelta + 5 * targetYdeltaavg
+                targetYdelta = targetYdelta + 3.3 * targetYdeltaavg
 
                 targetXdeltaavg = np.average(vectorXarray)
-                targetXdelta = targetXdelta + 5 * targetXdeltaavg
+                targetXdelta = targetXdelta + 3.3 * targetXdeltaavg
 
 
                 # ## limit max Y delta to 0.4 of (gameScrnHeight / 2)
@@ -403,10 +405,7 @@ with dai.Device(pipeline) as device:
 
                 errorY = targetY + targetYdelta
                 errorX = targetX + targetXdelta
-                
-                print("calculated errorY = ", errorY)
-                print("calculated errorX = ", errorX)
-
+                print("extrapolated errorY, errorX = ", errorY, errorX)
 
                 '''
                 pidClass psuedo-code
@@ -421,18 +420,23 @@ with dai.Device(pipeline) as device:
                 '''
 
                 ## experimental PID and scale tuning post-12/28/2023
-                KpY = 1  # previously tried vals (none)
-                KiY = 0  # previously tried vals (none)
-                KdY = 0  # previously tried vals (none)
+                KpY = 1     # 1 (previously tried vals)
+                KiY = 0     # 0 (previously tried vals)
+                KdY = 0     # 0 (previously tried vals)
 
-                KpX = 1  #  previously tried vals (none)
-                KiX = 0  #  previously tried vals (none)
-                KdX = 0  #  previously tried vals (none)
+                KpX = 1     # 1 (previously tried vals)
+                KiX = 0     # 0 (previously tried vals)
+                KdX = 0     # 0 (previously tried vals)
 
-                ScaleY = 1           # trial and error testing
-                ScaleX = 1           # trial and error testing
+                ScaleY = 1  # trial and error testing
+                ScaleX = 1  # trial and error testing
 
-                
+
+                errorY = errorY * ScaleY
+                errorX = errorX * ScaleX
+                print("Scaled and extrapolated errorY, errorX = ", errorY, errorX)
+
+
                 if keyboard.is_pressed(45):     # press and hold 'x' to target and fire
                     trackedTargFrameCount += 1
 
@@ -457,11 +461,6 @@ with dai.Device(pipeline) as device:
                     target = (pidTargetY, pidTargetX)
                     print("target after pids applied = ", target)
                     
-                    mouseMotionY = ScaleY * pidTargetY
-                    mouseMotionX = ScaleX * pidTargetX
-                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
-
-
                     ## move mouse to point at target
                     mouseMotionY, mouseMotionX =AimMouseAlt(target)
                                         
@@ -470,6 +469,8 @@ with dai.Device(pipeline) as device:
                         click()
                         click()
                         click()
+
+                    print("scaled mouseMotionY, mouseMotionX ", mouseMotionY, mouseMotionX)
 
                     ## Update mouseMotion arrays
                     mouseMotionYarray = np.append(mouseMotionYarray, mouseMotionY)
@@ -480,8 +481,8 @@ with dai.Device(pipeline) as device:
 
         if trackedCount == 0:
             trackedTargFrameCount = 0
-            vectorYarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
-            vectorXarray = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.float32)
+            vectorYarray = np.array([0,0,0,0,0], dtype=np.float32)
+            vectorXarray = np.array([0,0,0,0,0], dtype=np.float32)
             targetYprev = None
             targetXprev = None
 
