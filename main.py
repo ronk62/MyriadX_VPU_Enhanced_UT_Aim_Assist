@@ -100,7 +100,9 @@ manip.inputImage.setBlocking(True)
 ## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
 detectionNetwork.setConfidenceThreshold(0.75)
-detectionNetwork.input.setBlocking(True)
+# duplicate settings with opposite values below and at the end of the following block
+#detectionNetwork.input.setBlocking(True)  # original - set to True
+#detectionNetwork.input.setBlocking(False)  # setting to False here
 
 detectionNetwork.setNumClasses(80)
 detectionNetwork.setCoordinateSize(4)
@@ -108,6 +110,7 @@ detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319]
 detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
 detectionNetwork.setNumInferenceThreads(2)
+# original, below, - set to False)
 detectionNetwork.input.setBlocking(False)
 
 objectTracker.inputTrackerFrame.setBlocking(True)
@@ -202,7 +205,7 @@ with dai.Device(pipeline) as device:
     
 
     def capture_window_dxcam():
-        # UT game in 1278 x 686 windowed mode
+        # UT game in 1600 x 900 windowed mode
         image = np.array(camera.grab([0, 0, 1600, 900]))
         return image
     
@@ -433,8 +436,8 @@ with dai.Device(pipeline) as device:
 
 
                 ## scaling the error terms is a FAIL; should perhaps update var names back to target-blah
-                ## PID calculations (12/20/2023) also are a FAIL with current extrapolation and targeting scheme
-                ## might be worth trying to PID and scale the resulting mouse motion values
+                ## PID calculations (12/20/2023) also are a FAIL with current extrapolation and targeting
+                ## scheme; might be worth trying to PID and scale the resulting mouse motion values
                 # errorY = errorY * ScaleY
                 # errorX = errorX * ScaleX
                 # print("Scaled and extrapolated errorY, errorX = ", errorY, errorX)
