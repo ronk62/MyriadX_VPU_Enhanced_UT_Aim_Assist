@@ -207,6 +207,22 @@ with dai.Device(pipeline) as device:
     def capture_window_dxcam():
         # UT game in 1600 x 900 windowed mode
         image = np.array(camera.grab([0, 0, 1600, 900]))
+
+        # --- ADD THIS CHECK TO FIX THE ERROR ---
+        if image is None or len(image.shape) < 3:
+            return  # return from function call and try grabbing again next iteration
+        
+        # --- HOST PREPROCESSING (Bypasses USB Bottleneck) ---
+        # First, Crop 1600x900 -> 900x900 (Center Crop)
+        h, w, _ = image.shape
+        start_x = (w - h) // 2
+        cropped = image[:, start_x : start_x + h]
+
+        # Second, Downsample 900x900 -> 416x416
+        image = cv2.resize(
+            cropped, (416, 416), interpolation=cv2.INTER_AREA
+        )
+
         return image
     
     
@@ -246,7 +262,7 @@ with dai.Device(pipeline) as device:
         dtCapFrame, previous_time = deltaT(previous_time)
         eFPScapFrame = 1 / (dtCapFrame + 0.000000001)
 
-        if frame.size < 2:  # stop processing this iteration when frame is (essentially) empty
+        if frame is None or frame.size < 2:  # stop processing this iteration when frame is (essentially) empty
             continue
 
         inframe = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
