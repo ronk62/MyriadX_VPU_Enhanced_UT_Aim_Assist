@@ -146,18 +146,18 @@ with dai.Device(pipeline) as device:
     print(device.getUsbSpeed())
 
     ### blocking=False
-    # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
-    # trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
-    # tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
-    # qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
-    # qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
+    qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
+    trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
+    tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
+    qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
+    qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
 
     ### blocking=True
-    qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
-    trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=True)
-    tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=True)
-    qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=True)
-    qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=True)
+    # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
+    # trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=True)
+    # tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=True)
+    # qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=True)
+    # qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=True)
 
     startTime = time.monotonic()
     counter = 0
