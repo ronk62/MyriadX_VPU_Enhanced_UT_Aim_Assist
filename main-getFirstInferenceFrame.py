@@ -220,6 +220,9 @@ with dai.Device(pipeline) as device:
         manip = qManip.get()
         inDet = qDet.get()
 
+        dt_inDet, previous_time = deltaT(previous_time)
+        eFPS_inDet = 1 / (dt_inDet + 0.000000001)
+
         # ###
         # testLatency = inDet.getTimestamp()
         # testDaiClockNow = dai.Clock.now()
@@ -407,6 +410,7 @@ with dai.Device(pipeline) as device:
 
         print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
         print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        print("dt_inDet:", dt_inDet, "eFPS_inDet:", eFPS_inDet)
         print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
         print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
         print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
