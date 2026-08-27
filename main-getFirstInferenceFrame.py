@@ -182,8 +182,9 @@ with dai.Device(pipeline) as device:
     dTfirstFrameToTarget = 0
 
     while True:
+        initTime = time.time()
         previous_time = time.time()
-        initTime, previous_time = deltaT(previous_time)
+        # initTime, previous_time = deltaT(previous_time)
         # frame = capture_window_PIL()
         frame = capture_window_dxcam()
 
@@ -404,8 +405,9 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print()
