@@ -11,6 +11,12 @@ from pidController import *
 import matplotlib.pyplot as plt
 import dxcam
 
+
+'''
+8/26/2026 - implemented the part of this related to 'device.getInputQueue ... blocking=False' --> https://gemini.google.com/app/fb202449e88bd88d
+
+'''
+
 '''
 Significantly reduced latency (previously ~500 ms); did this by changing inputFrameShape from (1600, 900) to (416, 416)
 - in theory, reducing inputFrameShape minimized the data sent to the oak-d over USB, while retaining the data size/shape
@@ -95,14 +101,12 @@ xinFrame.setMaxDataSize(1920*1080*3)
 manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-manip.inputImage.setBlocking(True)
+manip.inputImage.setBlocking(True)      # orig setting
+# manip.inputImage.setBlocking(False)   # changed from True to False on 8/26/2026, but latency seemed worse
 
 ## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
 detectionNetwork.setConfidenceThreshold(0.75)
-# duplicate settings with opposite values below and at the end of the following block
-#detectionNetwork.input.setBlocking(True)  # original - set to True
-#detectionNetwork.input.setBlocking(False)  # setting to False here
 
 detectionNetwork.setNumClasses(80)
 detectionNetwork.setCoordinateSize(4)
@@ -111,11 +115,22 @@ detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
 detectionNetwork.setNumInferenceThreads(2)
 # original, below, - set to False)
-detectionNetwork.input.setBlocking(False)
+detectionNetwork.input.setBlocking(True)    # orig setting
+# detectionNetwork.input.setBlocking(False) # changed from True to False on 8/26/2026, but latency seemed worse
 
+## original settings were setBlocking True...latency seemed worse when set to False...
 objectTracker.inputTrackerFrame.setBlocking(True)
 objectTracker.inputDetectionFrame.setBlocking(True)
 objectTracker.inputDetections.setBlocking(True)
+
+## changed to setBlocking False...add 'setQueueSize(1)'...
+# objectTracker.inputTrackerFrame.setBlocking(False)
+# objectTracker.inputTrackerFrame.setQueueSize(1)
+# objectTracker.inputDetectionFrame.setBlocking(False)
+# objectTracker.inputDetectionFrame.setQueueSize(1)
+# objectTracker.inputDetections.setBlocking(False)
+# objectTracker.inputDetections.setQueueSize(1)
+
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 # objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
