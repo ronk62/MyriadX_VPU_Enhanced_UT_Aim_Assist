@@ -115,21 +115,21 @@ detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
 detectionNetwork.setNumInferenceThreads(2)
 # original, below, - set to False)
-detectionNetwork.input.setBlocking(True)    # orig setting
-# detectionNetwork.input.setBlocking(False) # changed from True to False on 8/26/2026, but latency seemed worse
+# detectionNetwork.input.setBlocking(True)    # orig setting
+detectionNetwork.input.setBlocking(False) # changed from True to False on 8/30/2026
 
 ## original settings were setBlocking True...latency seemed worse when set to False...
-objectTracker.inputTrackerFrame.setBlocking(True)
-objectTracker.inputDetectionFrame.setBlocking(True)
-objectTracker.inputDetections.setBlocking(True)
+# objectTracker.inputTrackerFrame.setBlocking(True)
+# objectTracker.inputDetectionFrame.setBlocking(True)
+# objectTracker.inputDetections.setBlocking(True)
 
 ## changed to setBlocking False...add 'setQueueSize(1)'...
-# objectTracker.inputTrackerFrame.setBlocking(False)
-# objectTracker.inputTrackerFrame.setQueueSize(1)
-# objectTracker.inputDetectionFrame.setBlocking(False)
-# objectTracker.inputDetectionFrame.setQueueSize(1)
-# objectTracker.inputDetections.setBlocking(False)
-# objectTracker.inputDetections.setQueueSize(1)
+objectTracker.inputTrackerFrame.setBlocking(False)
+objectTracker.inputTrackerFrame.setQueueSize(1)
+objectTracker.inputDetectionFrame.setBlocking(False)
+objectTracker.inputDetectionFrame.setQueueSize(1)
+objectTracker.inputDetections.setBlocking(False)
+objectTracker.inputDetections.setQueueSize(1)
 
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
@@ -269,9 +269,9 @@ with dai.Device(pipeline) as device:
         # time.sleep(0.09)    # limit to 1/n FPS
         # time.sleep(1)    # limit to 1/n FPS
         
+        initTime = time.time()
         previous_time = time.time()
-        _, previous_time = deltaT(previous_time)
-        initTime = previous_time
+        
         frame = capture_window_dxcam()
 
         dtCapFrame, previous_time = deltaT(previous_time)
@@ -545,13 +545,19 @@ with dai.Device(pipeline) as device:
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
-        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
-        # print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print()
+        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
+        print()
 
-        # ## break after first 25 tracks
+        ## check if fullLoopTime >= 0.05
+        if fullLoopTime >= 0.07:
+            continue
+
+        ## break after first 25 tracks
         # if len(timestampArray) == 25:
         #     break
     
