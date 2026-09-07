@@ -160,15 +160,18 @@ with dai.Device(pipeline) as device:
 
     print(device.getUsbSpeed())
 
-    ### blocking=False
+    # getInputQueue settings
     qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
+    # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
+    
+
+    ### getOutputQueue settings, blocking=False
     trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
     tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
     qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
     qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
 
-    ### blocking=True
-    # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
+    ### getOutputQueue settings, blocking=True
     # trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=True)
     # tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=True)
     # qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=True)
@@ -255,6 +258,8 @@ with dai.Device(pipeline) as device:
 
     diffs = np.array([])
 
+    initTime = time.time()
+
     ### initialize some targeting vars
     trackedTargFrameCount = 0
 
@@ -269,7 +274,7 @@ with dai.Device(pipeline) as device:
         # time.sleep(0.09)    # limit to 1/n FPS
         # time.sleep(1)    # limit to 1/n FPS
         
-        initTime = time.time()
+        loopInitTime = time.time()
         previous_time = time.time()
         
         frame = capture_window_dxcam()
@@ -301,6 +306,12 @@ with dai.Device(pipeline) as device:
         manip = qManip.get()
         inDet = qDet.get()
 
+        ## Latency in miliseconds   - FAILs in current config, 9/5/2026
+        # latencyMs = (dai.Clock.now() - inDet.getTimestamp()).total_seconds() * 1000
+        # diffs = np.append(diffs, latencyMs)
+        # print('curr time: {:.3f} ms, Latency: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format((time.time() - initTime), latencyMs, np.average(diffs), np.std(diffs)))
+
+
         counter+=1
         current_time = time.monotonic()
         if (current_time - startTime) > 1 :
@@ -310,14 +321,6 @@ with dai.Device(pipeline) as device:
 
         detections = inDet.detections
         manipFrame = manip.getCvFrame()
-
-        ## for latency testing  <-- note: 12/22/2023, this test does not work correctly with 
-        ##                                configurations with frame passed from host to oak-d
-        # Latency in miliseconds 
-        # latencyMs = (dai.Clock.now() - track.getTimestamp()).total_seconds() * 1000
-        # latencyMs = (dai.Clock.now() - trackFrame.getTimestamp()).total_seconds() * 1000
-        # diffs = np.append(diffs, latencyMs)
-        # print('Latency: {:.2f} ms, Average latency: {:.2f} ms, Std: {:.2f}'.format(latencyMs, np.average(diffs), np.std(diffs)))
 
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
@@ -541,15 +544,15 @@ with dai.Device(pipeline) as device:
         eFPSimshow = 1 / (dtImshow + 0.000000001)
 
         
-        fullLoopTime = time.time() - initTime
+        fullLoopTime = time.time() - loopInitTime
         eFPSfullLoopTime = 1 / (fullLoopTime + 0.000000001)
 
 
         print()
-        print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
-        print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
-        print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
-        print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
+        # print("dtCapFrame:", dtCapFrame, "eFPScapFrame:", eFPScapFrame)
+        # print("dtNNdetections:", dtNNdetections, "eFPSnnDetections:", eFPSnnDetections)
+        # print("dtTrackletsData:", dtTrackletsData, "eFPStrackletsData:", eFPStrackletsData)
+        # print("dtImshow:", dtImshow, "eFPSimshow:", eFPSimshow)
         print("fullLoopTime:", fullLoopTime, "eFPSfullLoopTime:", eFPSfullLoopTime)
         print()
 
