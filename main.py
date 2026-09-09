@@ -98,15 +98,50 @@ xlinkOut.setStreamName("trackerFrame")
 trackerOut.setStreamName("tracklets")
 nnOut.setStreamName("nn")
 
-# examine state of XLinkIn/Out nodes; uncomment for testing/reconfiguring
+### examine configuration state of nodes; uncomment for testing/reconfiguring
 # --- Examining XLinkIn ("inFrame") ---
 """ print("--- XLinkIn (xinFrame) Settings ---")
 print("Max Device Pool Frames:", xinFrame.getNumFrames())
-xinFrame.setNumFrames(1)
+xinFrame.setNumFrames(2)
 print("Max Device Pool Frames:", xinFrame.getNumFrames())
 print("Max Allowed Data Size (bytes):", xinFrame.getMaxDataSize())
 xinFrame.setMaxDataSize(1920*1080*3)
 print("Max Allowed Data Size (bytes):", xinFrame.getMaxDataSize()) """
+
+# --- Examining/configuring Node "manip" ---
+""" print("--- Node manip Settings ---")
+# configure...
+# manipNumFramesPool = 8                      # FAIL 9/8/2026
+# manip.setNumFramesPool(manipNumFramesPool)  # FAIL 9/8/2026; latency went WAY back in the wrong direction (got worse!)
+# DepthAI nodes typically do not expose a public .getNumFramesPool() getter method in Python
+# To track it, assign your pool size to a variable or track it manually in your script configuration
+print("--- ImageManip Queue Settings ---")
+# check Queue settings before adjusting...
+print("Input inputImage Queue Size:", manip.inputImage.getQueueSize())
+print("Input inputImage Queue Is Blocking:", manip.inputImage.getBlocking())
+print("Input inputConfig Queue Size:", manip.inputConfig.getQueueSize())
+print("Input inputConfig Queue Is Blocking:", manip.inputConfig.getBlocking())
+# 1. Image Input Queue (Where video/camera frames enter the manipulator)
+manip.inputImage.setQueueSize(1)
+manip.inputImage.setBlocking(False)  # Overwrites/drops frames instead of buffering
+# 2. Config Input Queue (Where runtime parameters like dynamic crops or scales enter)
+manip.inputConfig.setQueueSize(1)
+manip.inputConfig.setBlocking(False)
+# check Queue settings after adjusting...
+print("--- ImageManip Queue Settings ---")
+print("Input inputImage Queue Size:", manip.inputImage.getQueueSize())
+print("Input inputImage Queue Is Blocking:", manip.inputImage.getBlocking())
+print("Input inputConfig Queue Size:", manip.inputConfig.getQueueSize())
+print("Input inputConfig Queue Is Blocking:", manip.inputConfig.getBlocking()) """
+
+# --- Examining XLinkOut ("tracklets") ---
+""" print("--- XLinkOut (trackerOut) Settings ---")
+print("trackerOut input QueueSize", trackerOut.input.getQueueSize())
+trackerOut.input.setQueueSize(1)
+print("trackerOut input QueueSize", trackerOut.input.getQueueSize())
+print("trackerOut input Queue Is Blocking (True/False)", trackerOut.input.getBlocking())
+trackerOut.input.setBlocking(False)
+print("trackerOut input Queue Is Blocking (True/False)", trackerOut.input.getBlocking()) """
 
 # Properties
 xinFrame.setMaxDataSize(1920*1080*3)
@@ -137,13 +172,13 @@ detectionNetwork.setNumInferenceThreads(2)
 detectionNetwork.input.setBlocking(False)   # changed from True to False on 9/8/2026
 detectionNetwork.input.setQueueSize(1)      # added on 9/7/2026
 
-## original settings were setBlocking True...latency seemed worse when set to False...
-objectTracker.inputTrackerFrame.setBlocking(True)           # changed 9/8/2026
+## original settings were setBlocking True...latency seemed worse when set to False...but trying again 9/8/2026
+# objectTracker.inputTrackerFrame.setBlocking(True)           # changed 9/8/2026
 # objectTracker.inputDetectionFrame.setBlocking(True)
 # objectTracker.inputDetections.setBlocking(True)
 
 ## changed to setBlocking False...add 'setQueueSize(1)'...
-# objectTracker.inputTrackerFrame.setBlocking(False)        # changed 9/8/2026
+objectTracker.inputTrackerFrame.setBlocking(False)        # changed 9/8/2026
 objectTracker.inputTrackerFrame.setQueueSize(1)
 objectTracker.inputDetectionFrame.setBlocking(False)
 objectTracker.inputDetectionFrame.setQueueSize(1)
@@ -152,12 +187,26 @@ objectTracker.inputDetections.setQueueSize(1)
 
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
-objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
-# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
+objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_KCF)  # DON'T USE this one; WORST latency (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 ## take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+##### the below section is new, as of 9/8/2026...
+""" # Set the Tracker Pool Size (Crucial for VPU memory lag)
+# By default, ObjectTracker buffers up to 4 frames internally to do optical flow.
+# Set this to 1 or 2 to drastically decrease frame-to-output latency.
+# objectTracker.setNumFramesPool(1)   # FAIL...
+# ... 'depthai.node.ObjectTracker' object has no attribute 'setNumFramesPool' """
+# Filter out ghost tracks / dead targets instantly
+# If a target moves out of sight, drop it immediately instead of guessing its path.
+objectTracker.setTrackerThreshold(0.5)
+
+
+trackerOut.input.setBlocking(False)
+trackerOut.input.setQueueSize(1)
+
 
 # Linking
 manip.out.link(manipOut.input)     # 20260907 - why needed ?
