@@ -13,6 +13,7 @@ import dxcam
 
 
 '''
+9/8/2026  - retooled pipeline links, node settings and object var names to improve FPS based on pipeline_graph.exe run
 8/26/2026 - implemented the part of this related to 'device.getInputQueue ... blocking=False' --> https://gemini.google.com/app/fb202449e88bd88d
 
 '''
