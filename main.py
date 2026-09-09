@@ -98,8 +98,19 @@ xlinkOut.setStreamName("trackerFrame")
 trackerOut.setStreamName("tracklets")
 nnOut.setStreamName("nn")
 
+# examine state of XLinkIn/Out nodes; uncomment for testing/reconfiguring
+# --- Examining XLinkIn ("inFrame") ---
+""" print("--- XLinkIn (xinFrame) Settings ---")
+print("Max Device Pool Frames:", xinFrame.getNumFrames())
+xinFrame.setNumFrames(1)
+print("Max Device Pool Frames:", xinFrame.getNumFrames())
+print("Max Allowed Data Size (bytes):", xinFrame.getMaxDataSize())
+xinFrame.setMaxDataSize(1920*1080*3)
+print("Max Allowed Data Size (bytes):", xinFrame.getMaxDataSize()) """
+
 # Properties
 xinFrame.setMaxDataSize(1920*1080*3)
+xinFrame.setNumFrames(2)
 
 manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
@@ -122,8 +133,8 @@ detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
 detectionNetwork.setNumInferenceThreads(2)
 # original, below, - set to False)
-detectionNetwork.input.setBlocking(True)  # orig setting
-# detectionNetwork.input.setBlocking(False)   # changed from True to False on 8/30/2026
+# detectionNetwork.input.setBlocking(True)  # orig setting
+detectionNetwork.input.setBlocking(False)   # changed from True to False on 9/8/2026
 detectionNetwork.input.setQueueSize(1)      # added on 9/7/2026
 
 ## original settings were setBlocking True...latency seemed worse when set to False...
