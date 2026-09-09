@@ -65,6 +65,7 @@ pidX = PID()
 
 ## yolo v3 tiny label texts
 labelMap = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
+# labelMap = ["person", ""]     # changed 9/7/2026 (FAIL)
 
 nnPathDefault = str((Path(__file__).parent / Path('./models/yolo-v3-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
 parser = argparse.ArgumentParser()
@@ -83,13 +84,14 @@ manip = pipeline.create(dai.node.ImageManip)
 objectTracker = pipeline.create(dai.node.ObjectTracker)
 detectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork) # yolo-v3-tiny-tf
 
-manipOut = pipeline.create(dai.node.XLinkOut)
+manipOut = pipeline.create(dai.node.XLinkOut)     # 20260907 - why needed ?
 xinFrame = pipeline.create(dai.node.XLinkIn)
 trackerOut = pipeline.create(dai.node.XLinkOut)
 xlinkOut = pipeline.create(dai.node.XLinkOut)
 nnOut = pipeline.create(dai.node.XLinkOut)
 
-manipOut.setStreamName("manip")
+# manipOut.setStreamName("manip")     # 20260907 - why needed ?
+manipOut.setStreamName("manipOutStreamName")     # 20260907 - testing new streamName and var structure
 xinFrame.setStreamName("inFrame")
 xlinkOut.setStreamName("trackerFrame")
 trackerOut.setStreamName("tracklets")
@@ -101,30 +103,35 @@ xinFrame.setMaxDataSize(1920*1080*3)
 manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-manip.inputImage.setBlocking(True)      # orig setting
-# manip.inputImage.setBlocking(False)   # changed from True to False on 8/26/2026, but latency seemed worse
+manip.inputConfig.setBlocking(True)   # added on 9/7/2026
+manip.inputConfig.setQueueSize(1)     # added on 9/7/2026
+# manip.inputImage.setBlocking(True)    # orig setting
+manip.inputImage.setBlocking(False)     # changed to False on 9/7/2026
+manip.inputImage.setQueueSize(1)        # added on 9/7/2026
 
 ## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
 detectionNetwork.setConfidenceThreshold(0.75)
 
 detectionNetwork.setNumClasses(80)
+# detectionNetwork.setNumClasses(1)  # changed 9/7/2026 (FAIL)
 detectionNetwork.setCoordinateSize(4)
 detectionNetwork.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319])
 detectionNetwork.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
 detectionNetwork.setIouThreshold(0.5)
 detectionNetwork.setNumInferenceThreads(2)
 # original, below, - set to False)
-# detectionNetwork.input.setBlocking(True)    # orig setting
-detectionNetwork.input.setBlocking(False) # changed from True to False on 8/30/2026
+detectionNetwork.input.setBlocking(True)  # orig setting
+# detectionNetwork.input.setBlocking(False)   # changed from True to False on 8/30/2026
+detectionNetwork.input.setQueueSize(1)      # added on 9/7/2026
 
 ## original settings were setBlocking True...latency seemed worse when set to False...
-# objectTracker.inputTrackerFrame.setBlocking(True)
+objectTracker.inputTrackerFrame.setBlocking(True)           # changed 9/8/2026
 # objectTracker.inputDetectionFrame.setBlocking(True)
 # objectTracker.inputDetections.setBlocking(True)
 
 ## changed to setBlocking False...add 'setQueueSize(1)'...
-objectTracker.inputTrackerFrame.setBlocking(False)
+# objectTracker.inputTrackerFrame.setBlocking(False)        # changed 9/8/2026
 objectTracker.inputTrackerFrame.setQueueSize(1)
 objectTracker.inputDetectionFrame.setBlocking(False)
 objectTracker.inputDetectionFrame.setQueueSize(1)
@@ -133,18 +140,19 @@ objectTracker.inputDetections.setQueueSize(1)
 
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
-# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
-objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_KCF)  # DON'T USE this one; WORST latency (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 ## take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
 # Linking
-manip.out.link(manipOut.input)
+manip.out.link(manipOut.input)     # 20260907 - why needed ?
 manip.out.link(detectionNetwork.input)
 xinFrame.out.link(manip.inputImage)
-xinFrame.out.link(objectTracker.inputTrackerFrame)
+# xinFrame.out.link(objectTracker.inputTrackerFrame)    # replaced by line below on 9/8/2026
+manip.out.link(objectTracker.inputTrackerFrame)         # added on 9/8/2026 
 detectionNetwork.out.link(nnOut.input)
 detectionNetwork.out.link(objectTracker.inputDetections)
 detectionNetwork.passthrough.link(objectTracker.inputDetectionFrame)
@@ -161,6 +169,7 @@ with dai.Device(pipeline) as device:
     print(device.getUsbSpeed())
 
     # getInputQueue settings
+    # testing impact on latency; 9/7/2026 - no impact, setting back to False
     qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=False)
     # qIn = device.getInputQueue(name="inFrame", maxSize=1, blocking=True)
     
@@ -168,13 +177,15 @@ with dai.Device(pipeline) as device:
     ### getOutputQueue settings, blocking=False
     trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=False)
     tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=False)
-    qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=False)
+    # qManip = device.getOutputQueue(name="manipOutStreamName", maxSize=1, blocking=False)
+    qManipOutStream = device.getOutputQueue(name="manipOutStreamName", maxSize=1, blocking=False)
     qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=False)
 
     ### getOutputQueue settings, blocking=True
     # trackerFrameQ = device.getOutputQueue(name="trackerFrame", maxSize=1, blocking=True)
     # tracklets = device.getOutputQueue(name="tracklets", maxSize=1, blocking=True)
-    # qManip = device.getOutputQueue(name="manip", maxSize=1, blocking=True)
+    #qManip = device.getOutputQueue(name="manipOutStreamName", maxSize=1, blocking=True)
+    # qManipOutStream = device.getOutputQueue(name="manipOutStreamName", maxSize=1, blocking=True)
     # qDet = device.getOutputQueue(name="nn", maxSize=1, blocking=True)
 
     startTime = time.monotonic()
@@ -270,9 +281,10 @@ with dai.Device(pipeline) as device:
             print("breaking loop; plotting data...")
             break
         
-        time.sleep(0.0333)    # limit to ~30 FPS
-        # time.sleep(0.09)    # limit to 1/n FPS
-        # time.sleep(1)    # limit to 1/n FPS
+        # time.sleep(0.0333)    # limit to ~30 FPS
+        # time.sleep(0.025)     # limit to ~40 FPS    # tried on 9/7/2026
+        # time.sleep(0.0166)    # limit to ~60 FPS    # also tried on 9/7/2026
+        # time.sleep(0.05)      # limit to ~20 FPS    # also tried on 9/7/2026
         
         loopInitTime = time.time()
         previous_time = time.time()
@@ -303,7 +315,8 @@ with dai.Device(pipeline) as device:
             continue
 
         track = tracklets.get()
-        manip = qManip.get()
+        # manip = qManip.get()
+        manipOutFrame = qManipOutStream.get()
         inDet = qDet.get()
 
         ## Latency in miliseconds   - FAILs in current config, 9/5/2026
@@ -320,7 +333,8 @@ with dai.Device(pipeline) as device:
             startTime = current_time
 
         detections = inDet.detections
-        manipFrame = manip.getCvFrame()
+        # manipFrame = manip.getCvFrame()
+        manipFrame = manipOutFrame.getCvFrame()
 
         displayFrame("nn", manipFrame)
         dtNNdetections, previous_time = deltaT(previous_time)
