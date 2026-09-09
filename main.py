@@ -134,14 +134,33 @@ print("Input inputImage Queue Is Blocking:", manip.inputImage.getBlocking())
 print("Input inputConfig Queue Size:", manip.inputConfig.getQueueSize())
 print("Input inputConfig Queue Is Blocking:", manip.inputConfig.getBlocking()) """
 
+# --- Examining XLinkOut ("nn") ---
+""" print("--- XLinkOut (nnOut) Settings ---")
+print("nnOut (nn) input QueueSize", nnOut.input.getQueueSize())
+nnOut.input.setQueueSize(1)        #  nn, added 9/9/2026
+print("nnOut (nn) input QueueSize", nnOut.input.getQueueSize())
+print("nnOut (nn) input Queue Is Blocking (True/False)", nnOut.input.getBlocking())
+nnOut.input.setBlocking(False)     #  nn, added 9/9/2026
+print("nnOut (nn) input Queue Is Blocking (True/False)", nnOut.input.getBlocking()) """
+
 # --- Examining XLinkOut ("tracklets") ---
 """ print("--- XLinkOut (trackerOut) Settings ---")
-print("trackerOut input QueueSize", trackerOut.input.getQueueSize())
-trackerOut.input.setQueueSize(1)
-print("trackerOut input QueueSize", trackerOut.input.getQueueSize())
-print("trackerOut input Queue Is Blocking (True/False)", trackerOut.input.getBlocking())
-trackerOut.input.setBlocking(False)
-print("trackerOut input Queue Is Blocking (True/False)", trackerOut.input.getBlocking()) """
+print("trackerOut (tracklets) input QueueSize", trackerOut.input.getQueueSize())
+trackerOut.input.setQueueSize(1)        #  tracklets, added 9/8/2026
+print("trackerOut (tracklets) input QueueSize", trackerOut.input.getQueueSize())
+print("trackerOut (tracklets) input Queue Is Blocking (True/False)", trackerOut.input.getBlocking())
+trackerOut.input.setBlocking(False)     #  tracklets, added 9/8/2026
+print("trackerOut (tracklets) input Queue Is Blocking (True/False)", trackerOut.input.getBlocking()) """
+
+# --- Examining XLinkOut ("trackerFrame") ---
+""" print("--- xlinkOut (trackerFrame) Settings ---")
+print("xlinkOut (trackerFrame) input QueueSize", xlinkOut.input.getQueueSize())
+xlinkOut.input.setQueueSize(1)      # trackerFrame, added 9/9/2026
+print("xlinkOut (trackerFrame) input QueueSize", xlinkOut.input.getQueueSize())
+print("xlinkOut (trackerFrame) input Queue Is Blocking (True/False)", xlinkOut.input.getBlocking())
+xlinkOut.input.setBlocking(False)   # trackerFrame, added 9/9/2026
+print("xlinkOut (trackerFrame) input Queue Is Blocking (True/False)", xlinkOut.input.getBlocking()) """
+
 
 # Properties
 xinFrame.setMaxDataSize(1920*1080*3)
@@ -150,11 +169,12 @@ xinFrame.setNumFrames(2)
 manip.initialConfig.setResizeThumbnail(416, 416)    # change size to accomodate nn yolo-v3-tiny-tf
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-manip.inputConfig.setBlocking(True)   # added on 9/7/2026
-manip.inputConfig.setQueueSize(1)     # added on 9/7/2026
+manip.inputConfig.setBlocking(True)     # added on 9/7/2026
+manip.inputConfig.setQueueSize(1)       # added on 9/7/2026
 # manip.inputImage.setBlocking(True)    # orig setting
 manip.inputImage.setBlocking(False)     # changed to False on 9/7/2026
 manip.inputImage.setQueueSize(1)        # added on 9/7/2026
+manip.setNumFramesPool(12)              # added on 9/9/2026
 
 ## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
@@ -172,25 +192,25 @@ detectionNetwork.setNumInferenceThreads(2)
 detectionNetwork.input.setBlocking(False)   # changed from True to False on 9/8/2026
 detectionNetwork.input.setQueueSize(1)      # added on 9/7/2026
 
-## original settings were setBlocking True...latency seemed worse when set to False...but trying again 9/8/2026
-# objectTracker.inputTrackerFrame.setBlocking(True)           # changed 9/8/2026
-# objectTracker.inputDetectionFrame.setBlocking(True)
-# objectTracker.inputDetections.setBlocking(True)
+## original settings were setBlocking True...latency amd FPS are worse when set to False, 9/9/2026
+objectTracker.inputTrackerFrame.setBlocking(True)           # changed back 9/9/2026
+objectTracker.inputDetectionFrame.setBlocking(True)         # changed back 9/9/2026
+objectTracker.inputDetections.setBlocking(True)             # changed back 9/9/2026
 
 ## changed to setBlocking False...add 'setQueueSize(1)'...
-objectTracker.inputTrackerFrame.setBlocking(False)        # changed 9/8/2026
+# objectTracker.inputTrackerFrame.setBlocking(False)        # changed back 9/9/2026
 objectTracker.inputTrackerFrame.setQueueSize(1)
-objectTracker.inputDetectionFrame.setBlocking(False)
+# objectTracker.inputDetectionFrame.setBlocking(False)        # changed back 9/9/2026
 objectTracker.inputDetectionFrame.setQueueSize(1)
-objectTracker.inputDetections.setBlocking(False)
+# objectTracker.inputDetections.setBlocking(False)        # changed back 9/9/2026
 objectTracker.inputDetections.setQueueSize(1)
 
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 # objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
-objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_KCF)  # DON'T USE this one; WORST latency (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
-# objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 ## take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 ##### the below section is new, as of 9/8/2026...
@@ -199,13 +219,22 @@ objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLES
 # Set this to 1 or 2 to drastically decrease frame-to-output latency.
 # objectTracker.setNumFramesPool(1)   # FAIL...
 # ... 'depthai.node.ObjectTracker' object has no attribute 'setNumFramesPool' """
+# objectTracker.input.setNumFrames(1)     # 9/9/2026, corrected syntax to correct the above FAIL
+### 'depthai.node.ObjectTracker' object has no attribute 'input'
 # Filter out ghost tracks / dead targets instantly
 # If a target moves out of sight, drop it immediately instead of guessing its path.
 objectTracker.setTrackerThreshold(0.5)
 
 
-trackerOut.input.setBlocking(False)
-trackerOut.input.setQueueSize(1)
+nnOut.input.setQueueSize(1)        #  nn, added 9/9/2026
+nnOut.input.setBlocking(False)     #  nn, added 9/9/2026
+
+trackerOut.input.setBlocking(False) #  tracklets, added 9/8/2026
+# trackerOut.input.setQueueSize(1)    #  tracklets, added 9/8/2026
+
+xlinkOut.input.setBlocking(False)   # trackerFrame, added 9/9/2026
+# xlinkOut.input.setQueueSize(1)      # trackerFrame, added 9/9/2026
+
 
 
 # Linking
