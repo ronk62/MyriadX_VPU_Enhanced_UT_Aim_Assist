@@ -174,7 +174,7 @@ manip.inputConfig.setQueueSize(1)       # added on 9/7/2026
 # manip.inputImage.setBlocking(True)    # orig setting
 manip.inputImage.setBlocking(False)     # changed to False on 9/7/2026
 manip.inputImage.setQueueSize(1)        # added on 9/7/2026
-manip.setNumFramesPool(12)              # added on 9/9/2026
+manip.setNumFramesPool(12)              # added on 9/7/2026, needs more testing
 
 ## Network specific settings for yolo-v3-tiny-tf
 detectionNetwork.setBlobPath(args.nnPath)
@@ -208,9 +208,9 @@ objectTracker.inputDetections.setQueueSize(1)
 objectTracker.setDetectionLabelsToTrack([0])  # track only person - yolo-v3-tiny-tf
 ## possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 # objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)     # primary type used for all dev up to 12/20/2023
-# objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_IMAGELESS)  # BEST! Low latency and min oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 # objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_KCF)  # DON'T USE this one; WORST latency (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
-objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
+# objectTracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)  # WORST oscilations (12/22/2023); testing an alternatives to 'ZERO_TERM_COLOR_HISTOGRAM'
 ## take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
 objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 ##### the below section is new, as of 9/8/2026...
@@ -327,7 +327,8 @@ with dai.Device(pipeline) as device:
         # UT game in 1600 x 900 windowed mode
         image = np.array(camera.grab([0, 0, 1600, 900]))
 
-        # --- ADD THIS CHECK TO FIX THE ERROR ---
+        """ # --- ADD THIS CHECK TO FIX THE ERROR ---
+        # this change was aimed at reducing any latency coming from USB transfer rates, which was disproved
         if image is None or len(image.shape) < 3:
             return  # return from function call and try grabbing again next iteration
         
@@ -340,7 +341,7 @@ with dai.Device(pipeline) as device:
         # Second, Downsample 900x900 -> 416x416
         image = cv2.resize(
             cropped, (416, 416), interpolation=cv2.INTER_AREA
-        )
+        ) """
 
         return image
     
