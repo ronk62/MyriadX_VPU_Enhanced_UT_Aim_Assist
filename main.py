@@ -393,7 +393,7 @@ with dai.Device(pipeline) as device:
         img.setType(dai.ImgFrame.Type.BGR888p)
         img.setData(to_planar(inframe, inputFrameShape))
         img.setTimestamp(baseTs)
-        baseTs += 1/simulatedFps
+        # baseTs += 1/simulatedFps      # commented for a test on 9/9/2026; seems to be a solid change
 
         img.setWidth(inputFrameShape[0])
         img.setHeight(inputFrameShape[1])
