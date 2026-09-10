@@ -3,3 +3,5 @@ __pycache__/*
 *.pyc
 __pycache__/Keyboard_And_Mouse_Controls.cpython-38.pyc
 __pycache__/Keyboard_And_Mouse_Controls.cpython-38.pyc
+main-host-side-frame-downsize.py
+main-tmp-experimental.py
